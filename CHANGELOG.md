@@ -1,15 +1,16 @@
 # Changelog
 
-## Unreleased
+## v0.2.0
+
+Customization, chart settings and a few TradingView favorites.
 
 - Drawing styles: select a drawing to change its color (palette or custom), line width,
   line style (solid, dashed, dotted) and, for text, font size. Style changes can be undone.
 - Each tool remembers the last style you used, so new drawings start with it.
 - Chart settings (⚙): dark and light app themes; separate up/down colors for candle bodies,
-  borders and wicks (each part can be turned off);
-  background color, vertical/horizontal grid lines and grid color. Saved between visits.
-  The theme only changes the app; the chart's colors are set separately, so a dark app
-  with a light chart works.
+  borders and wicks (borders and wicks can be turned off); background color; vertical and
+  horizontal grid lines and grid color. Saved between visits. The theme only changes the app;
+  the chart's colors are set separately, so a dark app with a light chart works.
 - Show or hide volume, from the settings or the "vol" button on the chart.
 - Countdown to bar close: the last-price label on the price scale shows the time left until
   the current bar closes on a second line, updated every second. Can be turned off in the settings.
@@ -20,6 +21,8 @@
   price and time axes are gone for a cleaner look.
 - Drawings that would be hard to see on the current background (e.g. white text on the
   light theme) are drawn in the theme's text color.
+- Price labels pick dark or white text depending on their background color.
+- The "auto" button now turns auto-fit on and off.
 
 ## v0.1.0
 
