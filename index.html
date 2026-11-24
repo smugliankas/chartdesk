@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>chart-app</title>
+  </head>
+  <body>
+    <header class="toolbar">
+      <div class="group">
+        <select id="provider" title="Data source"></select>
+        <input id="symbol" type="text" spellcheck="false" autocomplete="off" title="Symbol" />
+        <button id="load" title="Load symbol">Load</button>
+        <label id="csvButton" class="button hidden" title="Open a CSV file (e.g. MT5 → Symbols → Bars → Export Bars)">
+          Open CSV…
+          <input id="csvFile" type="file" accept=".csv,.txt,.tsv,text/csv" hidden />
+        </label>
+      </div>
+
+      <div class="group" id="timeframes"></div>
+      <div class="group" id="tools"></div>
+
+      <div class="group">
+        <button id="deleteSelected" title="Delete selected drawing (Del)">Delete</button>
+        <button id="clearAll" title="Remove all drawings on this symbol">Clear all</button>
+      </div>
+
+      <span id="status"></span>
+    </header>
+
+    <main id="chartWrap">
+      <div id="legend"></div>
+      <div id="chart"></div>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
