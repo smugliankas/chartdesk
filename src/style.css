@@ -94,6 +94,13 @@ button.active {
   color: var(--danger);
 }
 
+button.icon {
+  width: 28px;
+  padding: 0;
+  justify-content: center;
+  font-size: 15px;
+}
+
 #status {
   margin-left: auto;
   color: var(--muted);
@@ -140,4 +147,48 @@ button.active {
 
 #legend .down {
   color: #ef5350;
+}
+
+dialog {
+  max-width: 460px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+
+dialog h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+dialog h3 {
+  margin: 18px 0 6px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+dialog p {
+  margin: 0 0 8px;
+}
+
+dialog a {
+  color: var(--accent);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }

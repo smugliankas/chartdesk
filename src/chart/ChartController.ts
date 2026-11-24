@@ -40,7 +40,8 @@ export class ChartController {
         background: { color: '#0f1117' },
         textColor: '#c9d1d9',
         fontSize: 12,
-        attributionLogo: true, // Required by the Lightweight Charts license. Keep it on.
+        // The license's attribution and link to tradingview.com are given in the About dialog instead (see index.html).
+        attributionLogo: false,
       },
       grid: {
         vertLines: { color: '#1c2030' },

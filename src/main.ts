@@ -224,6 +224,14 @@ function showLegend(c: Candle | undefined): void {
   legendEl.querySelector('b')!.textContent = `${symbol} · ${timeframe}`;
 }
 
+// --- About dialog ------------------------------------------------------------------
+
+const aboutDialog = $<HTMLDialogElement>('aboutDialog');
+$<HTMLButtonElement>('about').addEventListener('click', () => aboutDialog.showModal());
+aboutDialog.addEventListener('click', (e) => {
+  if (e.target === aboutDialog) aboutDialog.close(); // click on the backdrop
+});
+
 // --- start ----------------------------------------------------------------------------
 
 syncProviderUi();

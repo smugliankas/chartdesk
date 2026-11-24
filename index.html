@@ -26,12 +26,32 @@
       </div>
 
       <span id="status"></span>
+      <button id="about" class="icon" title="About">ⓘ</button>
     </header>
 
     <main id="chartWrap">
       <div id="legend"></div>
       <div id="chart"></div>
     </main>
+
+    <dialog id="aboutDialog">
+      <form method="dialog">
+        <h2>chart-app</h2>
+        <p class="muted">Free, open-source charting with unlimited drawings. Your data and drawings stay on your computer.</p>
+
+        <h3>Credits</h3>
+        <p>
+          Charts are rendered with
+          <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a>.<br />
+          TradingView Lightweight Charts™ Copyright © 2025 TradingView, Inc.
+          <a href="https://www.tradingview.com/" target="_blank" rel="noopener">https://www.tradingview.com/</a><br />
+          Licensed under the Apache License 2.0.
+        </p>
+        <p class="muted">This project is not affiliated with or endorsed by TradingView.</p>
+
+        <div class="dialog-actions"><button value="close" autofocus>Close</button></div>
+      </form>
+    </dialog>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

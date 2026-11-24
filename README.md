@@ -90,7 +90,10 @@ src/
 ## Credits
 
 Charts are rendered with [TradingView Lightweight Charts™](https://www.tradingview.com/lightweight-charts/)
-(Apache 2.0). Copyright © TradingView, Inc. As its license requires, the TradingView
-attribution logo stays visible on the chart.
+(Apache 2.0).
+
+TradingView Lightweight Charts™ Copyright © 2025 TradingView, Inc. https://www.tradingview.com/
+
+The attribution and link are also shown in the app's **About** dialog (ⓘ button), as the library's license requires.
 
 This project is not affiliated with or endorsed by TradingView.
