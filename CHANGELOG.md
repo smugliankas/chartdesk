@@ -8,6 +8,9 @@
 - Chart settings (⚙): dark and light themes, candle up/down colors, borders, wicks,
   background color, vertical/horizontal grid lines and grid color. Saved between visits.
 - Show or hide volume, from the settings or the "vol" button on the chart.
+- Monthly timeframe (1M). Timeframes are labeled 1m, 5m, 15m, 30m, 1H, 4H, 1D, 1W, 1M.
+- Text settings: color and size of the price/time scale labels and the symbol name.
+  If the chosen color is hard to read on the background, a readable one is used instead.
 - Dark theme is now neutral black instead of dark blue, and the border lines next to the
   price and time axes are gone for a cleaner look.
 - Drawings that would be hard to see on the current background (e.g. white text on the

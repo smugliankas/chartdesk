@@ -259,11 +259,10 @@ button.icon svg {
   z-index: 3;
   pointer-events: none;
   font-variant-numeric: tabular-nums;
-  color: var(--muted);
+  color: var(--chart-text, var(--text));
 }
 
 #legend b {
-  color: var(--text);
   margin-right: 8px;
 }
 
@@ -535,4 +534,15 @@ kbd {
 .segmented button.active {
   background: var(--accent);
   color: #fff;
+}
+
+.settings-row select {
+  height: 26px;
+  padding: 0 6px;
+}
+
+dialog .hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
 }

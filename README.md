@@ -9,7 +9,7 @@ your machine.
 
 ## Features
 
-- Candlestick chart with volume, 1m to 1w timeframes
+- Candlestick chart with volume; timeframes 1m, 5m, 15m, 30m, 1H, 4H, 1D, 1W and 1M
 - Older history loads automatically as you scroll left
 - Symbol search (Binance), live updates for crypto
 - Drawing tools: trend line, ray, extended line, horizontal and vertical lines, rectangle,
@@ -21,7 +21,8 @@ your machine.
 - Undo / redo, select, drag (whole drawing or one handle), delete with `Del`
 - Drawings are saved per symbol and stay in place when you switch timeframes
 - Log scale, auto-fit and "scroll to latest bar" controls; show/hide volume
-- Chart settings: dark and light themes, candle colors, borders and wicks, background, grid lines
+- Chart settings: dark and light themes, candle colors, borders and wicks, background, grid lines,
+  scale text color and size
 - Times shown in your local time zone
 
 ### Keyboard shortcuts

@@ -1,4 +1,4 @@
-import { defaultAppearance, withTheme, type Appearance, type Theme } from '../chart/appearance';
+import { defaultAppearance, FONT_SIZES, withTheme, type Appearance, type Theme } from '../chart/appearance';
 
 /**
  * The chart settings dialog. Every change is applied right away through `onChange`.
@@ -28,6 +28,13 @@ export function createSettingsDialog(
         <label><input type="checkbox" data-field="wicks" /> Wicks</label>
       </div>
 
+      <h3>Text</h3>
+      <div class="settings-row">
+        <label>Color <input type="color" data-field="textColor" /></label>
+        <label>Size <select data-field="fontSize">${FONT_SIZES.map((s) => `<option value="${s}">${s}px</option>`).join('')}</select></label>
+      </div>
+      <p class="hint">Price and time scales, and the symbol name on the chart.</p>
+
       <h3>Background</h3>
       <div class="settings-row">
         <label>Color <input type="color" data-field="background" /></label>
@@ -52,14 +59,14 @@ export function createSettingsDialog(
     </form>`;
   document.body.append(dialog);
 
-  const inputs = [...dialog.querySelectorAll<HTMLInputElement>('input[data-field]')];
+  const inputs = [...dialog.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[data-field], select[data-field]')];
   const themeButtons = [...dialog.querySelectorAll<HTMLButtonElement>('[data-field="theme"] button')];
 
   const sync = () => {
     const a = get();
     for (const input of inputs) {
       const value = a[input.dataset.field as keyof Appearance];
-      if (input.type === 'checkbox') input.checked = Boolean(value);
+      if (input instanceof HTMLInputElement && input.type === 'checkbox') input.checked = Boolean(value);
       else input.value = String(value);
     }
     for (const b of themeButtons) b.classList.toggle('active', b.value === a.theme);
@@ -68,7 +75,13 @@ export function createSettingsDialog(
   for (const input of inputs) {
     const apply = () => {
       const field = input.dataset.field as keyof Appearance;
-      onChange({ ...get(), [field]: input.type === 'checkbox' ? input.checked : input.value });
+      const value =
+        input instanceof HTMLInputElement && input.type === 'checkbox'
+          ? input.checked
+          : input instanceof HTMLSelectElement
+            ? Number(input.value)
+            : input.value;
+      onChange({ ...get(), [field]: value });
     };
     input.addEventListener(input.type === 'color' ? 'input' : 'change', apply);
   }

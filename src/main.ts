@@ -1,11 +1,11 @@
 import './style.css';
 import type { CandlestickData, Time } from 'lightweight-charts';
-import { loadAppearance, saveAppearance, type Appearance } from './chart/appearance';
+import { effectiveTextColor, loadAppearance, saveAppearance, type Appearance } from './chart/appearance';
 import { ChartController } from './chart/ChartController';
 import { DrawingManager } from './drawings/DrawingManager';
 import type { ToolId } from './drawings/model';
 import { csv, getProvider, PROVIDERS, type DataProvider } from './providers';
-import { TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from './types';
+import { TF_LABELS, TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from './types';
 import { createSettingsDialog } from './ui/settingsDialog';
 import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
@@ -88,6 +88,7 @@ function applyAppearance(a: Appearance): void {
   document.body.classList.toggle('light', a.theme === 'light');
   document.body.style.setProperty('--up', a.upColor);
   document.body.style.setProperty('--down', a.downColor);
+  document.body.style.setProperty('--chart-text', effectiveTextColor(a));
   volumeButton.classList.toggle('active', a.showVolume);
   drawings.redraw();
 }
@@ -102,7 +103,7 @@ for (const p of PROVIDERS) providerSelect.append(new Option(p.name, p.id));
 const tfButtons = new Map<Timeframe, HTMLButtonElement>();
 for (const tf of TIMEFRAMES) {
   const b = document.createElement('button');
-  b.textContent = tf;
+  b.textContent = TF_LABELS[tf];
   b.addEventListener('click', () => {
     timeframe = tf;
     settings.timeframe = tf;
@@ -177,7 +178,7 @@ function setStatus(text: string, isError = false): void {
 }
 
 function showReadyStatus(): void {
-  setStatus(`${symbol} · ${timeframe} · ${cc.barCount.toLocaleString()} bars`);
+  setStatus(`${symbol} · ${TF_LABELS[timeframe]} · ${cc.barCount.toLocaleString()} bars`);
 }
 
 function errorMessage(err: unknown): string {
@@ -298,7 +299,7 @@ async function load(): Promise<void> {
   historyLoading = false;
   historyDone = false;
   syncTimeframeUi();
-  setStatus(`Loading ${symbol} ${timeframe}…`);
+  setStatus(`Loading ${symbol} ${TF_LABELS[timeframe]}…`);
 
   try {
     const candles = await provider.getCandles(symbol, timeframe);
@@ -363,7 +364,7 @@ function showLegend(c: Candle | undefined): void {
     `<b></b>O <span class="${cls}">${f(c.open)}</span>  H <span class="${cls}">${f(c.high)}</span>  ` +
     `L <span class="${cls}">${f(c.low)}</span>  C <span class="${cls}">${f(c.close)}</span>`;
   // Symbol names come from user input or file names, so set them as text, never as HTML.
-  legendEl.querySelector('b')!.textContent = `${symbol} · ${timeframe}`;
+  legendEl.querySelector('b')!.textContent = `${symbol} · ${TF_LABELS[timeframe]}`;
 }
 
 // --- About dialog ------------------------------------------------------------------

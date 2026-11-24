@@ -1,4 +1,4 @@
-import { TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from '../types';
+import { TF_LABELS, TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from '../types';
 import type { DataProvider, SymbolInfo } from './types';
 
 interface Dataset {
@@ -33,7 +33,8 @@ export class CsvProvider implements DataProvider {
   baseTimeframe(symbol: string): Timeframe {
     const ds = this.datasets.get(symbol);
     if (!ds) return '1h';
-    return TIMEFRAMES.find((tf) => TF_SECONDS[tf] >= ds.interval) ?? '1w';
+    // Monthly bars are 28–31 days apart, so allow some slack when matching.
+    return TIMEFRAMES.find((tf) => TF_SECONDS[tf] >= ds.interval * 0.9) ?? '1M';
   }
 
   async searchSymbols(query: string): Promise<SymbolInfo[]> {
@@ -47,10 +48,11 @@ export class CsvProvider implements DataProvider {
     const ds = this.datasets.get(symbol);
     if (!ds) throw new Error('Open a CSV file first.');
     const target = TF_SECONDS[tf];
-    if (target < ds.interval) {
-      throw new Error(`This file has ${this.baseTimeframe(symbol)} bars. Pick ${this.baseTimeframe(symbol)} or higher.`);
+    const base = this.baseTimeframe(symbol);
+    if (target < TF_SECONDS[base]) {
+      throw new Error(`This file has ${TF_LABELS[base]} bars. Pick ${TF_LABELS[base]} or higher.`);
     }
-    if (target === ds.interval) return ds.candles.slice();
+    if (tf === base) return ds.candles.slice();
     return resample(ds.candles, target);
   }
 }
@@ -169,6 +171,10 @@ const WEEK_ANCHOR = 4 * 86400;
 
 function bucketStart(time: number, seconds: number): number {
   if (seconds === TF_SECONDS['1w']) return Math.floor((time - WEEK_ANCHOR) / seconds) * seconds + WEEK_ANCHOR;
+  if (seconds === TF_SECONDS['1M']) {
+    const d = new Date(time * 1000);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) / 1000;
+  }
   return Math.floor(time / seconds) * seconds;
 }
 

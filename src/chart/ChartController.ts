@@ -13,7 +13,7 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import type { Candle } from '../types';
-import { defaultAppearance, THEMES, withAlpha, type Appearance, type ThemeColors } from './appearance';
+import { defaultAppearance, effectiveTextColor, THEMES, withAlpha, type Appearance, type ThemeColors } from './appearance';
 
 /**
  * Owns the chart, the candle and volume series, and the mapping between
@@ -37,7 +37,6 @@ export class ChartController {
     this.chart = createChart(container, {
       autoSize: true,
       layout: {
-        fontSize: 12,
         // The license's attribution and link to tradingview.com are given in the About dialog instead (see index.html).
         attributionLogo: false,
       },
@@ -73,16 +72,14 @@ export class ChartController {
 
   /** Colors of the current theme, for drawings that need to contrast with the background. */
   get themeColors(): ThemeColors {
-    return { ...THEMES[this.look.theme], background: this.look.background };
+    return { ...THEMES[this.look.theme], background: this.look.background, text: effectiveTextColor(this.look) };
   }
 
   applyAppearance(a: Appearance): void {
     const volumeColorsChanged = a.upColor !== this.look.upColor || a.downColor !== this.look.downColor;
     this.look = a;
-    const theme = THEMES[a.theme];
-
     this.chart.applyOptions({
-      layout: { background: { color: a.background }, textColor: theme.text },
+      layout: { background: { color: a.background }, textColor: effectiveTextColor(a), fontSize: a.fontSize },
       grid: {
         vertLines: { visible: a.gridVert, color: a.gridColor },
         horzLines: { visible: a.gridHorz, color: a.gridColor },

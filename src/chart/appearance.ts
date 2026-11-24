@@ -12,7 +12,13 @@ export interface Appearance {
   gridHorz: boolean;
   gridColor: string;
   showVolume: boolean;
+  /** Color of the price/time scale labels and the symbol name in the legend. */
+  textColor: string;
+  /** Font size of the price/time scale labels. */
+  fontSize: number;
 }
+
+export const FONT_SIZES: readonly number[] = [10, 11, 12, 13, 14, 16];
 
 /** Colors that come with a theme (not user-editable on their own). */
 export interface ThemeColors {
@@ -39,12 +45,20 @@ export function defaultAppearance(theme: Theme = 'dark'): Appearance {
     gridHorz: true,
     gridColor: THEMES[theme].grid,
     showVolume: true,
+    textColor: THEMES[theme].text,
+    fontSize: 12,
   };
 }
 
 /** Switches theme: background and grid follow the theme, candle colors and toggles stay. */
 export function withTheme(a: Appearance, theme: Theme): Appearance {
-  return { ...a, theme, background: THEMES[theme].background, gridColor: THEMES[theme].grid };
+  return {
+    ...a,
+    theme,
+    background: THEMES[theme].background,
+    gridColor: THEMES[theme].grid,
+    textColor: THEMES[theme].text,
+  };
 }
 
 const KEY = 'chartdesk:appearance';
@@ -98,4 +112,15 @@ export function readable(color: string, background: string, fallback: string): s
   if (a === null || b === null) return color;
   const contrast = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   return contrast < 1.6 ? fallback : color;
+}
+
+/** Dark or light text, whichever reads better on `background`. */
+export function contrastText(background: string): string {
+  const l = luminance(background);
+  return l !== null && l > 0.4 ? THEMES.light.text : THEMES.dark.text;
+}
+
+/** The text color actually used: the chosen one, unless it would be unreadable on the background. */
+export function effectiveTextColor(a: Appearance): string {
+  return readable(a.textColor, a.background, contrastText(a.background));
 }
