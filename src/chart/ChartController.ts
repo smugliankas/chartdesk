@@ -202,8 +202,9 @@ export class ChartController {
     return this.candles.priceScale().options().autoScale;
   }
 
-  resetAutoScale(): void {
-    this.candles.priceScale().applyOptions({ autoScale: true });
+  /** Turning auto-scale off keeps the current price range where it is. */
+  setAutoScale(on: boolean): void {
+    this.candles.priceScale().setAutoScale(on);
   }
 
   priceScaleWidth(): number {

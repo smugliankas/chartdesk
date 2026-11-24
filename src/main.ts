@@ -279,7 +279,7 @@ volumeButton.addEventListener('click', () => {
   settingsDialog.sync();
 });
 autoButton.addEventListener('click', () => {
-  cc.resetAutoScale();
+  cc.setAutoScale(!cc.isAutoScale());
   syncControls();
 });
 
