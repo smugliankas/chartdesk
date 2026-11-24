@@ -2,9 +2,11 @@ import './style.css';
 import type { CandlestickData, Time } from 'lightweight-charts';
 import { ChartController } from './chart/ChartController';
 import { DrawingManager } from './drawings/DrawingManager';
-import { TOOLS, type ToolId } from './drawings/model';
+import type { ToolId } from './drawings/model';
 import { csv, getProvider, PROVIDERS, type DataProvider } from './providers';
 import { TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from './types';
+import { attachSymbolSearch } from './ui/symbolSearch';
+import { ALT, ICONS, MOD, TOOLBAR, toolTitle } from './ui/tools';
 
 // --- elements ----------------------------------------------------------------
 
@@ -12,14 +14,20 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 const providerSelect = $<HTMLSelectElement>('provider');
 const symbolInput = $<HTMLInputElement>('symbol');
-const loadButton = $<HTMLButtonElement>('load');
 const csvButton = $<HTMLLabelElement>('csvButton');
 const csvFile = $<HTMLInputElement>('csvFile');
 const tfGroup = $<HTMLDivElement>('timeframes');
-const toolGroup = $<HTMLDivElement>('tools');
+const sidebar = $<HTMLElement>('sidebar');
+const undoButton = $<HTMLButtonElement>('undo');
+const redoButton = $<HTMLButtonElement>('redo');
 const statusEl = $<HTMLSpanElement>('status');
 const legendEl = $<HTMLDivElement>('legend');
+const chartWrap = $<HTMLElement>('chartWrap');
 const chartEl = $<HTMLDivElement>('chart');
+const controlsEl = $<HTMLDivElement>('chartControls');
+const toLatestButton = $<HTMLButtonElement>('toLatest');
+const logButton = $<HTMLButtonElement>('logScale');
+const autoButton = $<HTMLButtonElement>('autoScale');
 
 // --- settings (remembered between visits) -------------------------------------
 
@@ -27,14 +35,16 @@ interface Settings {
   provider: string;
   timeframe: Timeframe;
   symbols: Record<string, string>;
+  magnet: boolean;
 }
 
-const SETTINGS_KEY = 'chart-app:settings';
+const SETTINGS_KEY = 'chartdesk:settings';
+const OLD_SETTINGS_KEY = 'chart-app:settings'; // before the project was named ChartDesk
 
 function loadSettings(): Settings {
-  const fallback: Settings = { provider: 'binance', timeframe: '1h', symbols: { binance: 'BTCUSDT' } };
+  const fallback: Settings = { provider: 'binance', timeframe: '1h', symbols: { binance: 'BTCUSDT' }, magnet: false };
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
+    const raw = localStorage.getItem(SETTINGS_KEY) ?? localStorage.getItem(OLD_SETTINGS_KEY);
     return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<Settings>) } : fallback;
   } catch {
     return fallback;
@@ -44,6 +54,7 @@ function loadSettings(): Settings {
 function saveSettings(): void {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    localStorage.removeItem(OLD_SETTINGS_KEY);
   } catch {
     /* ignore */
   }
@@ -58,15 +69,16 @@ let symbol = provider.freeSymbolInput ? (settings.symbols[provider.id] ?? '') : 
 let timeframe: Timeframe = TIMEFRAMES.includes(settings.timeframe) ? settings.timeframe : '1h';
 let stopLive: (() => void) | null = null;
 let loadSeq = 0;
+let historyLoading = false;
+let historyDone = false;
 
 const cc = new ChartController(chartEl);
 const drawings = new DrawingManager(cc, chartEl);
+drawings.setMagnet(settings.magnet);
 
-// --- UI setup ------------------------------------------------------------------
+// --- top bar ---------------------------------------------------------------------
 
-for (const p of PROVIDERS) {
-  providerSelect.append(new Option(p.name, p.id));
-}
+for (const p of PROVIDERS) providerSelect.append(new Option(p.name, p.id));
 
 const tfButtons = new Map<Timeframe, HTMLButtonElement>();
 for (const tf of TIMEFRAMES) {
@@ -82,25 +94,12 @@ for (const tf of TIMEFRAMES) {
   tfGroup.append(b);
 }
 
-const toolButtons = new Map<ToolId, HTMLButtonElement>();
-for (const t of TOOLS) {
-  const b = document.createElement('button');
-  b.textContent = t.label;
-  b.title = t.title;
-  b.addEventListener('click', () => drawings.setTool(t.id));
-  toolButtons.set(t.id, b);
-  toolGroup.append(b);
-}
-drawings.onToolChange((tool) => {
-  for (const [id, b] of toolButtons) b.classList.toggle('active', id === tool);
-});
-
-$<HTMLButtonElement>('deleteSelected').addEventListener('click', () => drawings.deleteSelected());
-$<HTMLButtonElement>('clearAll').addEventListener('click', () => {
-  if (drawings.drawings.length && confirm(`Remove all ${drawings.drawings.length} drawings on ${symbol}?`)) {
-    drawings.clearAll();
-  }
-});
+undoButton.innerHTML = ICONS.undo;
+undoButton.title = `Undo (${MOD}Z)`;
+undoButton.addEventListener('click', () => drawings.undo());
+redoButton.innerHTML = ICONS.redo;
+redoButton.title = `Redo (${MOD}⇧Z)`;
+redoButton.addEventListener('click', () => drawings.redo());
 
 providerSelect.addEventListener('change', () => {
   provider = getProvider(providerSelect.value);
@@ -116,9 +115,14 @@ providerSelect.addEventListener('change', () => {
   }
 });
 
-loadButton.addEventListener('click', () => submitSymbol());
-symbolInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') submitSymbol();
+attachSymbolSearch(symbolInput, {
+  search: (q) => provider.searchSymbols?.(q) ?? null,
+  onPick: (s) => {
+    symbol = s.toUpperCase();
+    settings.symbols[provider.id] = symbol;
+    saveSettings();
+    void load();
+  },
 });
 
 csvFile.addEventListener('change', async () => {
@@ -137,20 +141,10 @@ csvFile.addEventListener('change', async () => {
   }
 });
 
-function submitSymbol(): void {
-  const s = symbolInput.value.trim().toUpperCase();
-  if (!s) return;
-  symbol = s;
-  settings.symbols[provider.id] = s;
-  saveSettings();
-  void load();
-}
-
 function syncProviderUi(): void {
   providerSelect.value = provider.id;
   symbolInput.value = symbol;
   symbolInput.disabled = !provider.freeSymbolInput;
-  loadButton.classList.toggle('hidden', !provider.freeSymbolInput);
   csvButton.classList.toggle('hidden', provider.id !== csv.id);
 }
 
@@ -163,10 +157,110 @@ function setStatus(text: string, isError = false): void {
   statusEl.classList.toggle('error', isError);
 }
 
+function showReadyStatus(): void {
+  setStatus(`${symbol} · ${timeframe} · ${cc.barCount.toLocaleString()} bars`);
+}
+
 function errorMessage(err: unknown): string {
   if (err instanceof TypeError) return 'Network error. Check your connection.';
   return err instanceof Error ? err.message : String(err);
 }
+
+// --- left toolbar ------------------------------------------------------------------
+
+const toolButtons = new Map<ToolId, HTMLButtonElement>();
+
+function sidebarButton(icon: string, title: string, onClick: () => void): HTMLButtonElement {
+  const b = document.createElement('button');
+  b.className = 'tool';
+  b.innerHTML = icon;
+  b.title = title;
+  b.addEventListener('click', onClick);
+  sidebar.append(b);
+  return b;
+}
+
+function separator(): void {
+  sidebar.append(Object.assign(document.createElement('div'), { className: 'sep' }));
+}
+
+for (const t of TOOLBAR) {
+  if (!t) {
+    separator();
+    continue;
+  }
+  const b = sidebarButton(ICONS[t.id], toolTitle(t), () =>
+    drawings.setTool(drawings.currentTool === t.id && t.id !== 'cursor' ? 'cursor' : t.id),
+  );
+  toolButtons.set(t.id, b);
+}
+separator();
+const magnetButton = sidebarButton(ICONS.magnet, 'Magnet: snap to open/high/low/close', () => {
+  drawings.setMagnet(!drawings.magnetOn);
+  settings.magnet = drawings.magnetOn;
+  saveSettings();
+});
+const deleteButton = sidebarButton(ICONS.trash, 'Delete selected drawing (Del)', () => drawings.deleteSelected());
+const clearButton = sidebarButton(ICONS.trashAll, 'Remove all drawings on this symbol', () => {
+  if (drawings.drawings.length && confirm(`Remove all ${drawings.drawings.length} drawings on ${symbol}?`)) {
+    drawings.clearAll();
+  }
+});
+clearButton.classList.add('danger');
+
+drawings.onToolChange((tool) => {
+  for (const [id, b] of toolButtons) b.classList.toggle('active', id === tool);
+});
+drawings.onChange(() => {
+  undoButton.disabled = !drawings.canUndo;
+  redoButton.disabled = !drawings.canRedo;
+  deleteButton.disabled = !drawings.selectedId;
+  clearButton.disabled = drawings.drawings.length === 0;
+  magnetButton.classList.toggle('active', drawings.magnetOn);
+});
+
+// Alt/Option + key selects a tool.
+window.addEventListener('keydown', (e) => {
+  const target = e.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+  if (!e.altKey || e.metaKey || e.ctrlKey) return;
+  const t = TOOLBAR.find((d) => d?.key === e.code);
+  if (t) {
+    e.preventDefault();
+    drawings.setTool(t.id);
+  }
+});
+
+// --- chart controls (bottom right of the chart) -----------------------------------------
+
+toLatestButton.innerHTML = ICONS.toLatest;
+toLatestButton.addEventListener('click', () => cc.scrollToRealtime());
+logButton.addEventListener('click', () => {
+  cc.setLogScale(!cc.isLogScale());
+  syncControls();
+});
+autoButton.addEventListener('click', () => {
+  cc.resetAutoScale();
+  syncControls();
+});
+
+function syncControls(): void {
+  controlsEl.style.right = `${cc.priceScaleWidth() + 8}px`;
+  controlsEl.style.bottom = `${cc.timeScaleHeight() + 8}px`;
+  toLatestButton.classList.toggle('hidden', cc.barCount === 0 || cc.isLastBarVisible());
+  logButton.classList.toggle('active', cc.isLogScale());
+  autoButton.classList.toggle('active', cc.isAutoScale());
+}
+
+// Dragging or wheeling the price scale turns auto-scale off; refresh the button afterwards.
+chartWrap.addEventListener('mouseup', () => requestAnimationFrame(syncControls));
+chartWrap.addEventListener('wheel', () => requestAnimationFrame(syncControls), { passive: true });
+new ResizeObserver(() => requestAnimationFrame(syncControls)).observe(chartWrap);
+
+cc.chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+  syncControls();
+  if (range && range.from < 30) void loadOlder();
+});
 
 // --- loading -------------------------------------------------------------------
 
@@ -175,6 +269,8 @@ async function load(): Promise<void> {
   const seq = ++loadSeq;
   stopLive?.();
   stopLive = null;
+  historyLoading = false;
+  historyDone = false;
   syncTimeframeUi();
   setStatus(`Loading ${symbol} ${timeframe}…`);
 
@@ -186,7 +282,8 @@ async function load(): Promise<void> {
     cc.setData(candles, TF_SECONDS[timeframe]);
     drawings.setStorageKey(`${provider.id}:${symbol}`);
     showLegend(cc.lastCandle);
-    setStatus(`${symbol} · ${timeframe} · ${candles.length} bars`);
+    showReadyStatus();
+    syncControls();
 
     if (provider.subscribe) {
       stopLive = provider.subscribe(symbol, timeframe, (c) => {
@@ -197,6 +294,25 @@ async function load(): Promise<void> {
     }
   } catch (err) {
     if (seq === loadSeq) setStatus(errorMessage(err), true);
+  }
+}
+
+/** Loads the page of history before the first bar when the user scrolls to the left edge. */
+async function loadOlder(): Promise<void> {
+  const before = cc.firstTime;
+  if (historyLoading || historyDone || !provider.getCandlesBefore || before === undefined) return;
+  const seq = loadSeq;
+  historyLoading = true;
+  setStatus('Loading older bars…');
+  try {
+    const older = await provider.getCandlesBefore(symbol, timeframe, before);
+    if (seq !== loadSeq) return;
+    if (cc.prependData(older) === 0) historyDone = true;
+    showReadyStatus();
+  } catch (err) {
+    if (seq === loadSeq) setStatus(errorMessage(err), true);
+  } finally {
+    if (seq === loadSeq) historyLoading = false;
   }
 }
 
@@ -227,10 +343,28 @@ function showLegend(c: Candle | undefined): void {
 // --- About dialog ------------------------------------------------------------------
 
 const aboutDialog = $<HTMLDialogElement>('aboutDialog');
-$<HTMLButtonElement>('about').addEventListener('click', () => aboutDialog.showModal());
+const aboutButton = $<HTMLButtonElement>('about');
+aboutButton.innerHTML = ICONS.info;
+aboutButton.addEventListener('click', () => aboutDialog.showModal());
 aboutDialog.addEventListener('click', (e) => {
   if (e.target === aboutDialog) aboutDialog.close(); // click on the backdrop
 });
+
+const shortcuts: [string, string][] = [
+  ...TOOLBAR.filter((t) => t?.key).map((t) => [`${ALT}${t!.key!.replace('Key', '')}`, t!.title] as [string, string]),
+  ['Shift + click', 'Measure'],
+  ['Esc', 'Cursor / cancel'],
+  ['Del', 'Delete selected drawing'],
+  [`${MOD}Z`, 'Undo'],
+  [`${MOD}⇧Z`, 'Redo'],
+  ['Double-click text', 'Edit text'],
+];
+const shortcutTable = $<HTMLTableElement>('shortcutTable');
+for (const [key, what] of shortcuts) {
+  const row = shortcutTable.insertRow();
+  row.insertCell().append(Object.assign(document.createElement('kbd'), { textContent: key }));
+  row.insertCell().textContent = what;
+}
 
 // --- start ----------------------------------------------------------------------------
 

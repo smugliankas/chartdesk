@@ -1,6 +1,6 @@
-# chart-app
+# ChartDesk
 
-> Working name. A free, open-source charting app with **unlimited drawings**.
+> A free, open-source charting app with **unlimited drawings**.
 > Runs on your own computer, and you bring your own data.
 
 Tired of drawing limits, indicator caps and paywalls on your charting platform? This app
@@ -10,12 +10,28 @@ your machine.
 ## Features
 
 - Candlestick chart with volume, 1m to 1w timeframes
-- Drawing tools: trend line, horizontal line, rectangle, Fibonacci retracement
+- Older history loads automatically as you scroll left
+- Symbol search (Binance), live updates for crypto
+- Drawing tools: trend line, ray, extended line, horizontal and vertical lines, rectangle,
+  Fibonacci retracement, long/short position, text notes
+- Measure tool (`Shift` + click): price change, %, bars and time between two points
 - **No limit on the number of drawings**
+- Magnet mode: snap points to a bar's open, high, low or close
+- Undo / redo, select, drag (whole drawing or one handle), delete with `Del`
 - Drawings are saved per symbol and stay in place when you switch timeframes
-- Select, drag (whole drawing or one end), delete with `Del`, cancel with `Esc`
-- Live updates for crypto (Binance)
+- Log scale, auto-fit and "scroll to latest bar" controls
 - Times shown in your local time zone
+
+### Keyboard shortcuts
+
+| Keys | Action |
+| --- | --- |
+| `Alt/⌥` + `T` `H` `V` `R` `F` `L` `S` `N` `M` | Trend line, horizontal line, vertical line, rectangle, Fibonacci, long, short, text, measure |
+| `Shift` + click | Measure |
+| `Esc` | Cursor / cancel |
+| `Del` / `Backspace` | Delete selected drawing |
+| `⌘/Ctrl` + `Z`, `⌘/Ctrl` + `Shift` + `Z` | Undo, redo |
+| Double-click a text note | Edit it |
 
 ## Data sources
 
@@ -57,7 +73,9 @@ interface DataProvider {
   name: string;
   freeSymbolInput: boolean;
   getCandles(symbol: string, tf: Timeframe): Promise<Candle[]>;
-  subscribe?(symbol: string, tf: Timeframe, onCandle: (c: Candle) => void): () => void;
+  getCandlesBefore?(symbol: string, tf: Timeframe, beforeTime: number): Promise<Candle[]>; // older history
+  subscribe?(symbol: string, tf: Timeframe, onCandle: (c: Candle) => void): () => void;   // live updates
+  searchSymbols?(query: string): Promise<SymbolInfo[]>;                                    // symbol search
 }
 ```
 
@@ -73,17 +91,16 @@ run a server or redistribute anyone's market data.
 src/
   main.ts                    UI wiring
   chart/ChartController.ts   chart, series, time ↔ bar-index mapping
-  drawings/                  drawing tools (model, rendering, mouse handling, storage)
+  drawings/                  drawing tools (model, geometry, rendering, mouse handling, storage)
   providers/                 data sources (Binance, CSV)
+  ui/                        toolbar icons and tool list, symbol search
 ```
 
 ## Roadmap
 
 - [ ] MT5 bridge (forex, indices and gold from your own broker)
-- [ ] Load older history when scrolling left
-- [ ] More tools: ray, extended line, text, long/short position
-- [ ] FVG and liquidity tools
 - [ ] Drawing colors and styles
+- [ ] More timeframes and chart types
 - [ ] Export/import drawings
 - [ ] Desktop app (Tauri) for Windows and macOS
 

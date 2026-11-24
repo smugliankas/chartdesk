@@ -12,4 +12,4 @@ export function getProvider(id: string): DataProvider {
   return PROVIDERS.find((p) => p.id === id) ?? PROVIDERS[0];
 }
 
-export type { DataProvider } from './types';
+export type { DataProvider, SymbolInfo } from './types';

@@ -3,6 +3,7 @@ import {
   createChart,
   CrosshairMode,
   HistogramSeries,
+  PriceScaleMode,
   TickMarkType,
   type CandlestickData,
   type IChartApi,
@@ -89,18 +90,83 @@ export class ChartController {
 
   setData(candles: Candle[], intervalSeconds: number): void {
     this.data = candles.slice();
-    this.times = this.data.map((c) => c.time);
     this.interval = intervalSeconds;
     this.precision = detectPrecision(this.data);
-
     this.candles.applyOptions({
       priceFormat: { type: 'price', precision: this.precision, minMove: 10 ** -this.precision },
     });
-    this.candles.setData(this.data.map(toCandleData));
-    this.volume.setData(this.data.map(toVolumeData));
+    this.pushToSeries();
 
     const n = this.data.length;
     if (n > 0) this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 150), to: n + 12 });
+  }
+
+  /**
+   * Adds older candles to the left without moving what the user is looking at.
+   * Returns how many bars were added.
+   */
+  prependData(older: Candle[]): number {
+    const first = this.data[0];
+    const add = first ? older.filter((c) => c.time < first.time) : older;
+    if (add.length === 0) return 0;
+
+    const ts = this.chart.timeScale();
+    const range = ts.getVisibleLogicalRange();
+    this.data = [...add, ...this.data];
+    this.pushToSeries();
+    if (range) ts.setVisibleLogicalRange({ from: range.from + add.length, to: range.to + add.length });
+    return add.length;
+  }
+
+  private pushToSeries(): void {
+    this.times = this.data.map((c) => c.time);
+    this.candles.setData(this.data.map(toCandleData));
+    this.volume.setData(this.data.map(toVolumeData));
+  }
+
+  get firstTime(): number | undefined {
+    return this.data[0]?.time;
+  }
+
+  /** The candle at a bar index, if there is one. */
+  candleAt(index: number): Candle | undefined {
+    return this.data[index];
+  }
+
+  // --- view controls ------------------------------------------------------
+
+  scrollToRealtime(): void {
+    this.chart.timeScale().scrollToRealTime();
+  }
+
+  /** True when the last bar is on screen. */
+  isLastBarVisible(): boolean {
+    const range = this.chart.timeScale().getVisibleLogicalRange();
+    return !range || range.to >= this.data.length - 1;
+  }
+
+  isLogScale(): boolean {
+    return this.candles.priceScale().options().mode === PriceScaleMode.Logarithmic;
+  }
+
+  setLogScale(on: boolean): void {
+    this.candles.priceScale().applyOptions({ mode: on ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal });
+  }
+
+  isAutoScale(): boolean {
+    return this.candles.priceScale().options().autoScale;
+  }
+
+  resetAutoScale(): void {
+    this.candles.priceScale().applyOptions({ autoScale: true });
+  }
+
+  priceScaleWidth(): number {
+    return this.candles.priceScale().width();
+  }
+
+  timeScaleHeight(): number {
+    return this.chart.timeScale().height();
   }
 
   /** Applies a live update: replaces the last bar or appends a new one. */
@@ -148,7 +214,20 @@ export class ChartController {
   }
 
   timeToX(time: number): number | null {
-    return this.chart.timeScale().logicalToCoordinate(this.timeToLogical(time) as Logical);
+    return this.logicalToX(this.timeToLogical(time));
+  }
+
+  /**
+   * Bar index → x. The library only converts whole bar indexes, so fractional
+   * positions (a time between two bars) are interpolated here.
+   */
+  logicalToX(logical: number): number | null {
+    const ts = this.chart.timeScale();
+    const i = Math.floor(logical);
+    const x0 = ts.logicalToCoordinate(i as Logical);
+    if (x0 === null || logical === i) return x0;
+    const x1 = ts.logicalToCoordinate((i + 1) as Logical);
+    return x1 === null ? x0 : x0 + (logical - i) * (x1 - x0);
   }
 
   priceToY(price: number): number | null {

@@ -1,5 +1,5 @@
 import { TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from '../types';
-import type { DataProvider } from './types';
+import type { DataProvider, SymbolInfo } from './types';
 
 interface Dataset {
   candles: Candle[];
@@ -34,6 +34,13 @@ export class CsvProvider implements DataProvider {
     const ds = this.datasets.get(symbol);
     if (!ds) return '1h';
     return TIMEFRAMES.find((tf) => TF_SECONDS[tf] >= ds.interval) ?? '1w';
+  }
+
+  async searchSymbols(query: string): Promise<SymbolInfo[]> {
+    const q = query.trim().toUpperCase();
+    return [...this.datasets.keys()]
+      .filter((s) => s.toUpperCase().includes(q))
+      .map((symbol) => ({ symbol, detail: 'file' }));
   }
 
   async getCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {

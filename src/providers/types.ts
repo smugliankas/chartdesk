@@ -1,5 +1,12 @@
 import type { Candle, Timeframe } from '../types';
 
+/** One entry in the symbol search list. */
+export interface SymbolInfo {
+  symbol: string;
+  /** Short extra text shown next to the symbol (e.g. 24h change). */
+  detail?: string;
+}
+
 /**
  * A source of candle data.
  *
@@ -16,12 +23,21 @@ export interface DataProvider {
   /** Whether the user types a symbol (true) or the provider supplies it (e.g. a loaded file). */
   readonly freeSymbolInput: boolean;
 
-  /** Historical candles, oldest first. */
+  /** The most recent candles, oldest first. */
   getCandles(symbol: string, tf: Timeframe): Promise<Candle[]>;
+
+  /**
+   * Optional: older candles that end before `beforeTime` (UNIX seconds), oldest first.
+   * Called when the user scrolls to the left edge. Return an empty array when there is no more history.
+   */
+  getCandlesBefore?(symbol: string, tf: Timeframe, beforeTime: number): Promise<Candle[]>;
 
   /**
    * Optional live updates. `onCandle` receives the latest (possibly still forming) bar.
    * Returns a function that stops the subscription.
    */
   subscribe?(symbol: string, tf: Timeframe, onCandle: (candle: Candle) => void): () => void;
+
+  /** Optional symbol search for the symbol box. Best matches first. */
+  searchSymbols?(query: string): Promise<SymbolInfo[]>;
 }
