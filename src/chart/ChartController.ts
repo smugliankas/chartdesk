@@ -99,6 +99,29 @@ export class ChartController {
 
     const n = this.data.length;
     if (n > 0) this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 150), to: n + 12 });
+    if (!this.isAutoScale()) this.fitPriceIfOffscreen(Math.max(0, n - 150));
+  }
+
+  /**
+   * With auto-scale off the price scale keeps its old range, so after switching to a
+   * symbol at a very different price the candles would be off screen. In that case,
+   * frame the visible bars once and leave auto-scale off, as the user had it.
+   */
+  private fitPriceIfOffscreen(fromIndex: number): void {
+    const last = this.lastCandle;
+    if (!last) return;
+    const scale = this.candles.priceScale();
+    const range = scale.getVisibleRange();
+    if (range && last.close >= Math.min(range.from, range.to) && last.close <= Math.max(range.from, range.to)) return;
+
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let i = fromIndex; i < this.data.length; i++) {
+      lo = Math.min(lo, this.data[i].low);
+      hi = Math.max(hi, this.data[i].high);
+    }
+    const pad = (hi - lo) * 0.1 || Math.abs(hi) * 0.01 || 1;
+    scale.setVisibleRange({ from: lo - pad, to: hi + pad });
   }
 
   /**
