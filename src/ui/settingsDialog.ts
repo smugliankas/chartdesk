@@ -36,6 +36,11 @@ export function createSettingsDialog(
       </div>
       <p class="hint">Price and time scales, and the symbol name on the chart.</p>
 
+      <h3>Price scale</h3>
+      <div class="settings-row">
+        <label><input type="checkbox" data-field="countdown" /> Countdown to bar close</label>
+      </div>
+
       <h3>Background</h3>
       <div class="settings-row">
         <label>Color <input type="color" data-field="background" /></label>

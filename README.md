@@ -12,6 +12,7 @@ your machine.
 - Candlestick chart with volume; timeframes 1m, 5m, 15m, 30m, 1H, 4H, 1D, 1W and 1M
 - Older history loads automatically as you scroll left
 - Symbol search (Binance), live updates for crypto
+- Countdown to bar close in the last-price label (can be turned off in the settings)
 - Drawing tools: trend line, ray, extended line, horizontal and vertical lines, rectangle,
   Fibonacci retracement, long/short position, text notes
 - Measure tool (`Shift` + click): price change, %, bars and time between two points

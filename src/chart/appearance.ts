@@ -16,6 +16,8 @@ export interface Appearance {
   textColor: string;
   /** Font size of the price/time scale labels. */
   fontSize: number;
+  /** Show the time left until the current bar closes, under the last price. */
+  countdown: boolean;
 }
 
 export const FONT_SIZES: readonly number[] = [10, 11, 12, 13, 14, 16];
@@ -47,6 +49,7 @@ export function defaultAppearance(theme: Theme = 'dark'): Appearance {
     showVolume: true,
     textColor: THEMES[theme].text,
     fontSize: 12,
+    countdown: true,
   };
 }
 
@@ -117,4 +120,10 @@ export function contrastText(background: string): string {
 /** The text color actually used: the chosen one, unless it would be unreadable on the background. */
 export function effectiveTextColor(a: Appearance): string {
   return readable(a.textColor, a.background, contrastText(a.background));
+}
+
+/** Text color for a label with this background: dark on light labels, white on dark ones. */
+export function labelTextColor(background: string): string {
+  const l = luminance(background);
+  return l !== null && l > 0.32 ? THEMES.light.text : '#ffffff';
 }

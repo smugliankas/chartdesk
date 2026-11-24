@@ -10,6 +10,8 @@
   The theme only changes the app; the chart's colors are set separately, so a dark app
   with a light chart works.
 - Show or hide volume, from the settings or the "vol" button on the chart.
+- Countdown to bar close: the last-price label on the price scale shows the time left until
+  the current bar closes on a second line, updated every second. Can be turned off in the settings.
 - Monthly timeframe (1M). Timeframes are labeled 1m, 5m, 15m, 30m, 1H, 4H, 1D, 1W, 1M.
 - Text settings: color and size of the price/time scale labels and the symbol name.
   If the chosen color is hard to read on the background, a readable one is used instead.

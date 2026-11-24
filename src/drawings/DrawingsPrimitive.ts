@@ -6,7 +6,7 @@ import type {
   SeriesAttachedParameter,
   Time,
 } from 'lightweight-charts';
-import { readable } from '../chart/appearance';
+import { labelTextColor, readable } from '../chart/appearance';
 import type { ChartController } from '../chart/ChartController';
 import { extendSegment, handlesOf } from './geometry';
 import {
@@ -38,7 +38,6 @@ export interface DrawingSource {
 }
 
 const LABEL_FONT = '11px system-ui, -apple-system, Segoe UI, sans-serif';
-const AXIS_TEXT = '#0c0c0c';
 
 /**
  * A single Lightweight Charts primitive that paints every drawing on top of the candles,
@@ -78,7 +77,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         return {
           coordinate: () => y ?? -100,
           text: () => text,
-          textColor: () => AXIS_TEXT,
+          textColor: () => labelTextColor(d.color),
           backColor: () => d.color,
           visible: () => y !== null,
         };

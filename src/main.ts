@@ -2,6 +2,7 @@ import './style.css';
 import type { CandlestickData, Time } from 'lightweight-charts';
 import { effectiveTextColor, loadAppearance, saveAppearance, type Appearance } from './chart/appearance';
 import { ChartController } from './chart/ChartController';
+import { BarCountdown } from './chart/countdown';
 import { DrawingManager } from './drawings/DrawingManager';
 import type { ToolId } from './drawings/model';
 import { csv, getProvider, PROVIDERS, type DataProvider } from './providers';
@@ -78,6 +79,14 @@ let historyDone = false;
 
 const cc = new ChartController(chartEl);
 const drawings = new DrawingManager(cc, chartEl);
+const countdown = new BarCountdown(cc);
+cc.candles.attachPrimitive(countdown);
+/** Timeframe of the live (still forming) bars on screen, or null for static data like a CSV file. */
+let liveTimeframe: Timeframe | null = null;
+
+function syncCountdown(): void {
+  countdown.setTimeframe(cc.appearance.countdown ? liveTimeframe : null);
+}
 drawings.setMagnet(settings.magnet);
 
 // --- appearance ---------------------------------------------------------------
@@ -91,6 +100,7 @@ function applyAppearance(a: Appearance): void {
   document.body.style.setProperty('--chart-text', effectiveTextColor(a));
   volumeButton.classList.toggle('active', a.showVolume);
   drawings.redraw();
+  syncCountdown();
 }
 
 const settingsDialog = createSettingsDialog(() => cc.appearance, applyAppearance);
@@ -131,6 +141,8 @@ providerSelect.addEventListener('change', () => {
   else if (!provider.freeSymbolInput) {
     stopLive?.();
     stopLive = null;
+    liveTimeframe = null;
+    syncCountdown();
     setStatus('Open a CSV file to start.');
   }
 });
@@ -296,6 +308,8 @@ async function load(): Promise<void> {
   const seq = ++loadSeq;
   stopLive?.();
   stopLive = null;
+  liveTimeframe = null;
+  syncCountdown();
   historyLoading = false;
   historyDone = false;
   syncTimeframeUi();
@@ -313,6 +327,8 @@ async function load(): Promise<void> {
     syncControls();
 
     if (provider.subscribe) {
+      liveTimeframe = timeframe;
+      syncCountdown();
       stopLive = provider.subscribe(symbol, timeframe, (c) => {
         if (seq !== loadSeq) return;
         cc.update(c);
