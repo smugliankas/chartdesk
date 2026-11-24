@@ -1,14 +1,24 @@
 :root {
-  --bg: #0f1117;
-  --panel: #161a24;
-  --border: #2a2f3e;
-  --hover: #222838;
-  --text: #c9d1d9;
-  --muted: #8b93a7;
+  --bg: #0c0c0c;
+  --panel: #141414;
+  --border: #262626;
+  --hover: #202020;
+  --text: #d6d6d6;
+  --muted: #8a8a8a;
   --accent: #4f8cff;
   --up: #26a69a;
   --down: #ef5350;
   color-scheme: dark;
+}
+
+body.light {
+  --bg: #ffffff;
+  --panel: #f7f8fa;
+  --border: #dfe2e8;
+  --hover: #eceff4;
+  --text: #131722;
+  --muted: #6a6f7d;
+  color-scheme: light;
 }
 
 * {
@@ -276,7 +286,8 @@ button.icon svg {
   height: 24px;
   padding: 0 8px;
   font-size: 12px;
-  background: rgba(22, 26, 36, 0.9);
+  background: var(--panel);
+  opacity: 0.92;
 }
 
 #chartControls button.icon {
@@ -349,7 +360,7 @@ button.icon svg {
   width: 16px;
   height: 16px;
   border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--muted);
 }
 
 .palette {
@@ -370,12 +381,12 @@ button.icon svg {
   width: 22px;
   height: 22px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(128, 128, 128, 0.4);
   border-radius: 5px;
 }
 
 .palette-swatch:hover:not(:disabled) {
-  border-color: #fff;
+  border-color: var(--text);
 }
 
 .palette-custom {
@@ -405,7 +416,7 @@ button.icon svg {
   padding: 3px 4px;
   border: 1px solid var(--accent);
   border-radius: 3px;
-  background: rgba(15, 17, 23, 0.92);
+  background: var(--bg);
   outline: none;
   resize: none;
   line-height: 17px;
@@ -471,4 +482,57 @@ kbd {
   display: flex;
   justify-content: flex-end;
   margin-top: 16px;
+}
+
+.dialog-actions.spread {
+  justify-content: space-between;
+}
+
+/* --- Chart settings dialog --------------------------------------------------------- */
+
+#settingsDialog {
+  width: 440px;
+}
+
+.settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+
+.settings-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.settings-row input[type='color'] {
+  width: 34px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.segmented button {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  min-width: 70px;
+}
+
+.segmented button.active {
+  background: var(--accent);
+  color: #fff;
 }

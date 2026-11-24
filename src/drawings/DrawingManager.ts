@@ -1,3 +1,4 @@
+import { readable } from '../chart/appearance';
 import type { ChartController } from '../chart/ChartController';
 import { DrawingsPrimitive, type DrawingSource } from './DrawingsPrimitive';
 import { distToSegment, extendSegment, handlesOf, moveHandle, moveWhole, type Part } from './geometry';
@@ -340,7 +341,8 @@ export class DrawingManager implements DrawingSource {
     ta.style.top = `${rect.top - hostRect.top + pos.y}px`;
     ta.style.font = textFont(fontSize);
     ta.style.lineHeight = `${textLineHeight(fontSize)}px`;
-    ta.style.color = style.color;
+    const theme = this.cc.themeColors;
+    ta.style.color = readable(style.color, theme.background, theme.text);
     ta.rows = Math.max(1, ta.value.split('\n').length);
     host.append(ta);
     this.textEditor = ta;

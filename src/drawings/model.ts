@@ -83,7 +83,7 @@ export const LINE_STYLES: readonly LineStyle[] = ['solid', 'dashed', 'dotted'];
 export const FONT_SIZES: readonly number[] = [10, 12, 13, 14, 16, 18, 20, 24, 28, 32];
 
 export const PALETTE: readonly string[] = [
-  '#e6e9ef', '#8b93a7', '#4f8cff', '#00bcd4', '#26a69a', '#2ecc71',
+  '#e6e9ef', '#8a8a8a', '#4f8cff', '#00bcd4', '#26a69a', '#2ecc71',
   '#cddc39', '#f5d742', '#f5a623', '#ff7043', '#ef5350', '#ec407a',
   '#b07cff', '#7e57c2', '#795548', '#000000',
 ];

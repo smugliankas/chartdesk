@@ -20,7 +20,8 @@ your machine.
 - Magnet mode: snap points to a bar's open, high, low or close
 - Undo / redo, select, drag (whole drawing or one handle), delete with `Del`
 - Drawings are saved per symbol and stay in place when you switch timeframes
-- Log scale, auto-fit and "scroll to latest bar" controls
+- Log scale, auto-fit and "scroll to latest bar" controls; show/hide volume
+- Chart settings: dark and light themes, candle colors, borders and wicks, background, grid lines
 - Times shown in your local time zone
 
 ### Keyboard shortcuts

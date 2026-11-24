@@ -1,10 +1,12 @@
 import './style.css';
 import type { CandlestickData, Time } from 'lightweight-charts';
+import { loadAppearance, saveAppearance, type Appearance } from './chart/appearance';
 import { ChartController } from './chart/ChartController';
 import { DrawingManager } from './drawings/DrawingManager';
 import type { ToolId } from './drawings/model';
 import { csv, getProvider, PROVIDERS, type DataProvider } from './providers';
 import { TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from './types';
+import { createSettingsDialog } from './ui/settingsDialog';
 import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
 import { ALT, ICONS, MOD, TOOLBAR, toolTitle } from './ui/tools';
@@ -28,6 +30,7 @@ const chartEl = $<HTMLDivElement>('chart');
 const controlsEl = $<HTMLDivElement>('chartControls');
 const toLatestButton = $<HTMLButtonElement>('toLatest');
 const logButton = $<HTMLButtonElement>('logScale');
+const volumeButton = $<HTMLButtonElement>('volume');
 const autoButton = $<HTMLButtonElement>('autoScale');
 
 // --- settings (remembered between visits) -------------------------------------
@@ -76,6 +79,21 @@ let historyDone = false;
 const cc = new ChartController(chartEl);
 const drawings = new DrawingManager(cc, chartEl);
 drawings.setMagnet(settings.magnet);
+
+// --- appearance ---------------------------------------------------------------
+
+function applyAppearance(a: Appearance): void {
+  cc.applyAppearance(a);
+  saveAppearance(a);
+  document.body.classList.toggle('light', a.theme === 'light');
+  document.body.style.setProperty('--up', a.upColor);
+  document.body.style.setProperty('--down', a.downColor);
+  volumeButton.classList.toggle('active', a.showVolume);
+  drawings.redraw();
+}
+
+const settingsDialog = createSettingsDialog(() => cc.appearance, applyAppearance);
+applyAppearance(loadAppearance());
 
 // --- top bar ---------------------------------------------------------------------
 
@@ -243,6 +261,10 @@ logButton.addEventListener('click', () => {
   cc.setLogScale(!cc.isLogScale());
   syncControls();
 });
+volumeButton.addEventListener('click', () => {
+  applyAppearance({ ...cc.appearance, showVolume: !cc.appearance.showVolume });
+  settingsDialog.sync();
+});
 autoButton.addEventListener('click', () => {
   cc.resetAutoScale();
   syncControls();
@@ -347,6 +369,10 @@ function showLegend(c: Candle | undefined): void {
 // --- About dialog ------------------------------------------------------------------
 
 const aboutDialog = $<HTMLDialogElement>('aboutDialog');
+const settingsButton = $<HTMLButtonElement>('settings');
+settingsButton.innerHTML = ICONS.settings;
+settingsButton.addEventListener('click', () => settingsDialog.open());
+
 const aboutButton = $<HTMLButtonElement>('about');
 aboutButton.innerHTML = ICONS.info;
 aboutButton.addEventListener('click', () => aboutDialog.showModal());

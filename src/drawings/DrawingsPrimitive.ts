@@ -6,6 +6,7 @@ import type {
   SeriesAttachedParameter,
   Time,
 } from 'lightweight-charts';
+import { readable } from '../chart/appearance';
 import type { ChartController } from '../chart/ChartController';
 import { extendSegment, handlesOf } from './geometry';
 import {
@@ -37,7 +38,7 @@ export interface DrawingSource {
 }
 
 const LABEL_FONT = '11px system-ui, -apple-system, Segoe UI, sans-serif';
-const BG = '#0f1117';
+const AXIS_TEXT = '#0c0c0c';
 
 /**
  * A single Lightweight Charts primitive that paints every drawing on top of the candles,
@@ -77,7 +78,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         return {
           coordinate: () => y ?? -100,
           text: () => text,
-          textColor: () => BG,
+          textColor: () => AXIS_TEXT,
           backColor: () => d.color,
           visible: () => y !== null,
         };
@@ -114,8 +115,10 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
 
   private drawOne(ctx: CanvasRenderingContext2D, size: { w: number; h: number }, d: Drawing, selected: boolean): void {
     ctx.save();
-    ctx.strokeStyle = d.color;
-    ctx.fillStyle = d.color;
+    const theme = this.cc.themeColors;
+    const color = readable(d.color, theme.background, theme.text);
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
     const width = d.width ?? DEFAULT_WIDTH;
     ctx.lineWidth = width + (selected ? 0.75 : 0);
     setDash(ctx, d.lineStyle ?? 'solid', width);
@@ -217,7 +220,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       ctx.setLineDash([]);
       for (const h of handlesOf(d)) {
         const p = this.xy(h.point);
-        if (p) handle(ctx, p.x, p.y);
+        if (p) handle(ctx, p.x, p.y, theme.background);
       }
     }
     ctx.restore();
@@ -242,7 +245,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     zone(yE, yT, '#26a69a');
     zone(yE, yS, '#ef5350');
 
-    ctx.strokeStyle = '#c9d1d9';
+    ctx.strokeStyle = this.cc.themeColors.text;
     ctx.lineWidth = 1;
     line(ctx, left, yE, left + w, yE);
 
@@ -306,10 +309,10 @@ function setDash(ctx: CanvasRenderingContext2D, style: LineStyle, width: number)
   } else ctx.setLineDash([]);
 }
 
-function handle(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+function handle(ctx: CanvasRenderingContext2D, x: number, y: number, fill: string): void {
   ctx.beginPath();
   ctx.arc(x, y, 4.5, 0, Math.PI * 2);
-  ctx.fillStyle = BG;
+  ctx.fillStyle = fill;
   ctx.fill();
   ctx.lineWidth = 2;
   ctx.stroke();

@@ -13,9 +13,7 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import type { Candle } from '../types';
-
-const UP = '#26a69a';
-const DOWN = '#ef5350';
+import { defaultAppearance, THEMES, withAlpha, type Appearance, type ThemeColors } from './appearance';
 
 /**
  * Owns the chart, the candle and volume series, and the mapping between
@@ -33,25 +31,18 @@ export class ChartController {
   private times: number[] = [];
   private interval = 3600;
   private precision = 2;
+  private look: Appearance = defaultAppearance();
 
   constructor(container: HTMLElement) {
     this.chart = createChart(container, {
       autoSize: true,
       layout: {
-        background: { color: '#0f1117' },
-        textColor: '#c9d1d9',
         fontSize: 12,
         // The license's attribution and link to tradingview.com are given in the About dialog instead (see index.html).
         attributionLogo: false,
       },
-      grid: {
-        vertLines: { color: '#1c2030' },
-        horzLines: { color: '#1c2030' },
-      },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: '#2a2f3e' },
       timeScale: {
-        borderColor: '#2a2f3e',
         timeVisible: true,
         secondsVisible: false,
         rightOffset: 12,
@@ -62,14 +53,7 @@ export class ChartController {
       },
     });
 
-    this.candles = this.chart.addSeries(CandlestickSeries, {
-      upColor: UP,
-      downColor: DOWN,
-      borderUpColor: UP,
-      borderDownColor: DOWN,
-      wickUpColor: UP,
-      wickDownColor: DOWN,
-    });
+    this.candles = this.chart.addSeries(CandlestickSeries);
 
     this.volume = this.chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
@@ -78,6 +62,47 @@ export class ChartController {
       priceLineVisible: false,
     });
     this.chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+    this.applyAppearance(this.look);
+  }
+
+  // --- appearance -----------------------------------------------------------
+
+  get appearance(): Appearance {
+    return this.look;
+  }
+
+  /** Colors of the current theme, for drawings that need to contrast with the background. */
+  get themeColors(): ThemeColors {
+    return { ...THEMES[this.look.theme], background: this.look.background };
+  }
+
+  applyAppearance(a: Appearance): void {
+    const volumeColorsChanged = a.upColor !== this.look.upColor || a.downColor !== this.look.downColor;
+    this.look = a;
+    const theme = THEMES[a.theme];
+
+    this.chart.applyOptions({
+      layout: { background: { color: a.background }, textColor: theme.text },
+      grid: {
+        vertLines: { visible: a.gridVert, color: a.gridColor },
+        horzLines: { visible: a.gridHorz, color: a.gridColor },
+      },
+      // No border lines between the chart and its axes: a cleaner, more modern look.
+      rightPriceScale: { borderVisible: false },
+      timeScale: { borderVisible: false },
+    });
+    this.candles.applyOptions({
+      upColor: a.upColor,
+      downColor: a.downColor,
+      borderVisible: a.borders,
+      borderUpColor: a.upColor,
+      borderDownColor: a.downColor,
+      wickVisible: a.wicks,
+      wickUpColor: a.upColor,
+      wickDownColor: a.downColor,
+    });
+    this.volume.applyOptions({ visible: a.showVolume });
+    if (volumeColorsChanged && this.data.length) this.volume.setData(this.data.map((c) => this.toVolumeData(c)));
   }
 
   get barCount(): number {
@@ -144,7 +169,7 @@ export class ChartController {
   private pushToSeries(): void {
     this.times = this.data.map((c) => c.time);
     this.candles.setData(this.data.map(toCandleData));
-    this.volume.setData(this.data.map(toVolumeData));
+    this.volume.setData(this.data.map((c) => this.toVolumeData(c)));
   }
 
   get firstTime(): number | undefined {
@@ -203,7 +228,15 @@ export class ChartController {
       this.times.push(candle.time);
     }
     this.candles.update(toCandleData(candle));
-    this.volume.update(toVolumeData(candle));
+    this.volume.update(this.toVolumeData(candle));
+  }
+
+  private toVolumeData(c: Candle) {
+    return {
+      time: c.time as UTCTimestamp,
+      value: c.volume ?? 0,
+      color: withAlpha(c.close >= c.open ? this.look.upColor : this.look.downColor, 0.35),
+    };
   }
 
   // --- coordinate helpers -------------------------------------------------
@@ -283,13 +316,6 @@ function toCandleData(c: Candle): CandlestickData<Time> {
   return { time: c.time as UTCTimestamp, open: c.open, high: c.high, low: c.low, close: c.close };
 }
 
-function toVolumeData(c: Candle) {
-  return {
-    time: c.time as UTCTimestamp,
-    value: c.volume ?? 0,
-    color: c.close >= c.open ? 'rgba(38,166,154,0.35)' : 'rgba(239,83,80,0.35)',
-  };
-}
 
 function decimals(n: number): number {
   const s = String(n);
