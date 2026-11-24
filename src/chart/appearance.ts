@@ -3,10 +3,15 @@ export type Theme = 'dark' | 'light';
 /** Everything about how the chart looks. Saved between visits. */
 export interface Appearance {
   theme: Theme;
+  /** Candle body colors. */
   upColor: string;
   downColor: string;
   borders: boolean;
+  borderUpColor: string;
+  borderDownColor: string;
   wicks: boolean;
+  wickUpColor: string;
+  wickDownColor: string;
   background: string;
   gridVert: boolean;
   gridHorz: boolean;
@@ -41,7 +46,11 @@ export function defaultAppearance(theme: Theme = 'dark'): Appearance {
     upColor: '#26a69a',
     downColor: '#ef5350',
     borders: true,
+    borderUpColor: '#26a69a',
+    borderDownColor: '#ef5350',
     wicks: true,
+    wickUpColor: '#26a69a',
+    wickDownColor: '#ef5350',
     background: THEMES[theme].background,
     gridVert: true,
     gridHorz: true,
@@ -68,6 +77,15 @@ export function loadAppearance(): Appearance {
     // The first dark theme was dark blue; move its default colors to the new black theme.
     if (saved.background === '#0f1117') saved.background = THEMES.dark.background;
     if (saved.gridColor === '#1c2030') saved.gridColor = THEMES.dark.grid;
+    // Settings saved before borders and wicks had their own colors: they used the body colors.
+    if (saved.upColor) {
+      saved.borderUpColor ??= saved.upColor;
+      saved.wickUpColor ??= saved.upColor;
+    }
+    if (saved.downColor) {
+      saved.borderDownColor ??= saved.downColor;
+      saved.wickDownColor ??= saved.downColor;
+    }
     return { ...defaultAppearance(theme), ...saved, theme };
   } catch {
     return defaultAppearance();

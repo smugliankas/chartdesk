@@ -92,11 +92,11 @@ export class ChartController {
       upColor: a.upColor,
       downColor: a.downColor,
       borderVisible: a.borders,
-      borderUpColor: a.upColor,
-      borderDownColor: a.downColor,
+      borderUpColor: a.borderUpColor,
+      borderDownColor: a.borderDownColor,
       wickVisible: a.wicks,
-      wickUpColor: a.upColor,
-      wickDownColor: a.downColor,
+      wickUpColor: a.wickUpColor,
+      wickDownColor: a.wickDownColor,
     });
     this.volume.applyOptions({ visible: a.showVolume });
     if (volumeColorsChanged && this.data.length) this.volume.setData(this.data.map((c) => this.toVolumeData(c)));

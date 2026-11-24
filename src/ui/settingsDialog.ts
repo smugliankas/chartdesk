@@ -22,11 +22,17 @@ export function createSettingsDialog(
       <p class="hint">Changes the app's colors. The chart's colors below stay as you set them.</p>
 
       <h3>Candles</h3>
-      <div class="settings-row">
-        <label>Up <input type="color" data-field="upColor" /></label>
-        <label>Down <input type="color" data-field="downColor" /></label>
-        <label><input type="checkbox" data-field="borders" /> Borders</label>
-        <label><input type="checkbox" data-field="wicks" /> Wicks</label>
+      <div class="candle-grid">
+        <span></span><span class="col-head">Up</span><span class="col-head">Down</span>
+        <span class="row-head">Body</span>
+        <input type="color" data-field="upColor" title="Body, up" />
+        <input type="color" data-field="downColor" title="Body, down" />
+        <label class="row-head"><input type="checkbox" data-field="borders" /> Borders</label>
+        <input type="color" data-field="borderUpColor" title="Border, up" />
+        <input type="color" data-field="borderDownColor" title="Border, down" />
+        <label class="row-head"><input type="checkbox" data-field="wicks" /> Wicks</label>
+        <input type="color" data-field="wickUpColor" title="Wick, up" />
+        <input type="color" data-field="wickDownColor" title="Wick, down" />
       </div>
 
       <h3>Text</h3>
@@ -76,6 +82,12 @@ export function createSettingsDialog(
       else input.value = String(value);
     }
     for (const b of themeButtons) b.classList.toggle('active', b.value === a.theme);
+    // Border/wick colors only matter while borders/wicks are shown.
+    for (const input of inputs) {
+      const f = input.dataset.field;
+      if (f === 'borderUpColor' || f === 'borderDownColor') input.disabled = !a.borders;
+      if (f === 'wickUpColor' || f === 'wickDownColor') input.disabled = !a.wicks;
+    }
   };
 
   for (const input of inputs) {
@@ -88,6 +100,7 @@ export function createSettingsDialog(
             ? Number(input.value)
             : input.value;
       onChange({ ...get(), [field]: value });
+      if (typeof value === 'boolean') sync();
     };
     input.addEventListener(input.type === 'color' ? 'input' : 'change', apply);
   }

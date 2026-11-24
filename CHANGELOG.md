@@ -5,7 +5,8 @@
 - Drawing styles: select a drawing to change its color (palette or custom), line width,
   line style (solid, dashed, dotted) and, for text, font size. Style changes can be undone.
 - Each tool remembers the last style you used, so new drawings start with it.
-- Chart settings (⚙): dark and light app themes, candle up/down colors, borders, wicks,
+- Chart settings (⚙): dark and light app themes; separate up/down colors for candle bodies,
+  borders and wicks (each part can be turned off);
   background color, vertical/horizontal grid lines and grid color. Saved between visits.
   The theme only changes the app; the chart's colors are set separately, so a dark app
   with a light chart works.
