@@ -2,6 +2,8 @@
   "name": "chartdesk",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-only",
+  "repository": "github:smugliankas/chartdesk",
   "description": "Open-source, local-first charting app with unlimited drawings. Bring your own data: Binance, CSV (MT5 export), more to come.",
   "type": "module",
   "scripts": {

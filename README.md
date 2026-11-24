@@ -104,6 +104,17 @@ src/
 - [ ] Export/import drawings
 - [ ] Desktop app (Tauri) for Windows and macOS
 
+## License
+
+Copyright © 2026 Ömer Çolak
+
+ChartDesk is free software, licensed under the **GNU Affero General Public License v3.0**
+(`AGPL-3.0-only`). See [LICENSE](LICENSE).
+
+In short: you can use, study, change and share it. If you share a modified version, or run one
+as a website or service for other people, you must make your source code available under the
+same license. ChartDesk stays free, and so does every version built on it.
+
 ## Credits
 
 Charts are rendered with [TradingView Lightweight Charts™](https://www.tradingview.com/lightweight-charts/)
