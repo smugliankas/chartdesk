@@ -5,6 +5,7 @@ import { DrawingManager } from './drawings/DrawingManager';
 import type { ToolId } from './drawings/model';
 import { csv, getProvider, PROVIDERS, type DataProvider } from './providers';
 import { TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from './types';
+import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
 import { ALT, ICONS, MOD, TOOLBAR, toolTitle } from './ui/tools';
 
@@ -208,10 +209,13 @@ const clearButton = sidebarButton(ICONS.trashAll, 'Remove all drawings on this s
 });
 clearButton.classList.add('danger');
 
+const syncStyleBar = createStyleBar(chartWrap, drawings);
+
 drawings.onToolChange((tool) => {
   for (const [id, b] of toolButtons) b.classList.toggle('active', id === tool);
 });
 drawings.onChange(() => {
+  syncStyleBar();
   undoButton.disabled = !drawings.canUndo;
   redoButton.disabled = !drawings.canRedo;
   deleteButton.disabled = !drawings.selectedId;

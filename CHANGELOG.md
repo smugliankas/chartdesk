@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Drawing styles: select a drawing to change its color (palette or custom), line width,
+  line style (solid, dashed, dotted) and, for text, font size. Style changes can be undone.
+- Each tool remembers the last style you used, so new drawings start with it.
+
 ## v0.1.0
 
 First public release of ChartDesk: free, open-source charting with unlimited drawings.

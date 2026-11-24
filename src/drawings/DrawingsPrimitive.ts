@@ -9,14 +9,17 @@ import type {
 import type { ChartController } from '../chart/ChartController';
 import { extendSegment, handlesOf } from './geometry';
 import {
+  DEFAULT_FONT_SIZE,
+  DEFAULT_WIDTH,
   FIB_LEVELS,
   fibPrice,
   formatDuration,
   measureText,
-  TEXT_FONT,
-  TEXT_LINE_HEIGHT,
   TEXT_PADDING,
+  textFont,
+  textLineHeight,
   type Drawing,
+  type LineStyle,
   type Point,
   type Position,
 } from './model';
@@ -113,7 +116,9 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     ctx.save();
     ctx.strokeStyle = d.color;
     ctx.fillStyle = d.color;
-    ctx.lineWidth = selected ? 2 : 1.25;
+    const width = d.width ?? DEFAULT_WIDTH;
+    ctx.lineWidth = width + (selected ? 0.75 : 0);
+    setDash(ctx, d.lineStyle ?? 'solid', width);
     ctx.font = LABEL_FONT;
     const reach = (size.w + size.h) * 4;
 
@@ -165,9 +170,11 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         if (!a || !b) break;
         const left = Math.min(a.x, b.x);
         const right = Math.max(a.x, b.x);
+        ctx.save();
+        ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
         line(ctx, a.x, a.y, b.x, b.y);
-        ctx.setLineDash([]);
+        ctx.restore();
         ctx.textBaseline = 'bottom';
         for (const level of FIB_LEVELS) {
           const price = fibPrice(d, level);
@@ -182,17 +189,21 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       case 'text': {
         const p = this.xy(d.p);
         if (!p) break;
-        const { width, height } = measureText(d.text);
+        const fontSize = d.fontSize ?? DEFAULT_FONT_SIZE;
+        const box = measureText(d.text, fontSize);
         if (selected) {
           ctx.globalAlpha = 0.12;
-          ctx.fillRect(p.x, p.y, width, height);
+          ctx.fillRect(p.x, p.y, box.width, box.height);
           ctx.globalAlpha = 1;
           ctx.lineWidth = 1;
-          ctx.strokeRect(p.x, p.y, width, height);
+          ctx.setLineDash([]);
+          ctx.strokeRect(p.x, p.y, box.width, box.height);
         }
-        ctx.font = TEXT_FONT;
+        ctx.font = textFont(fontSize);
         ctx.textBaseline = 'top';
-        d.text.split('\n').forEach((l, i) => ctx.fillText(l, p.x + TEXT_PADDING, p.y + TEXT_PADDING + i * TEXT_LINE_HEIGHT + 2));
+        const lh = textLineHeight(fontSize);
+        const offset = (lh - fontSize) / 2;
+        d.text.split('\n').forEach((l, i) => ctx.fillText(l, p.x + TEXT_PADDING, p.y + TEXT_PADDING + i * lh + offset));
         break;
       }
 
@@ -203,6 +214,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     }
 
     if (selected) {
+      ctx.setLineDash([]);
       for (const h of handlesOf(d)) {
         const p = this.xy(h.point);
         if (p) handle(ctx, p.x, p.y);
@@ -284,6 +296,14 @@ function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number,
   ctx.moveTo(x1, y1);
   ctx.lineTo(x2, y2);
   ctx.stroke();
+}
+
+function setDash(ctx: CanvasRenderingContext2D, style: LineStyle, width: number): void {
+  if (style === 'dashed') ctx.setLineDash([5 + width * 2, 4 + width]);
+  else if (style === 'dotted') {
+    ctx.lineCap = 'round';
+    ctx.setLineDash([0.1, 2.5 * width + 1.5]);
+  } else ctx.setLineDash([]);
 }
 
 function handle(ctx: CanvasRenderingContext2D, x: number, y: number): void {

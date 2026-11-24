@@ -3,20 +3,26 @@ import { DrawingsPrimitive, type DrawingSource } from './DrawingsPrimitive';
 import { distToSegment, extendSegment, handlesOf, moveHandle, moveWhole, type Part } from './geometry';
 import {
   DEFAULT_COLORS,
+  DEFAULT_FONT_SIZE,
+  DEFAULT_WIDTH,
   FIB_LEVELS,
   fibPrice,
   isTwoPointType,
   measureText,
   newId,
-  TEXT_FONT,
+  styleSupport,
+  textFont,
+  textLineHeight,
   type Drawing,
+  type DrawingStyle,
+  type DrawingType,
   type Point,
   type TextNote,
   type ToolId,
   type TwoPointDrawing,
   type TwoPointType,
 } from './model';
-import { loadDrawings, saveDrawings } from './storage';
+import { loadDrawings, loadStyleDefaults, saveDrawings, saveStyleDefaults } from './storage';
 
 interface DragState {
   id: string;
@@ -28,7 +34,7 @@ interface DragState {
 }
 
 const HANDLE_RADIUS = 8;
-const LINE_TOLERANCE = 6;
+const BASE_TOLERANCE = 6;
 const HISTORY_LIMIT = 200;
 
 /**
@@ -54,6 +60,10 @@ export class DrawingManager implements DrawingSource {
   private undoStack: Drawing[][] = [];
   private redoStack: Drawing[][] = [];
   private textEditor: HTMLTextAreaElement | null = null;
+  /** Last-used style per drawing type; new drawings start with it. */
+  private styleDefaults = loadStyleDefaults();
+  /** Snapshot taken when a live style preview (e.g. dragging in the color picker) starts. */
+  private styleBefore: Drawing[] | null = null;
 
   private readonly primitive: DrawingsPrimitive;
   private readonly listeners = { tool: [] as ((t: ToolId) => void)[], change: [] as (() => void)[] };
@@ -89,6 +99,43 @@ export class DrawingManager implements DrawingSource {
 
   get canRedo(): boolean {
     return this.redoStack.length > 0;
+  }
+
+  get selectedDrawing(): Drawing | null {
+    return this.drawings.find((d) => d.id === this.selectedId) ?? null;
+  }
+
+  /**
+   * Changes the style of the selected drawing and remembers it for that tool.
+   * With `live`, the change is shown but not yet recorded as an undo step
+   * (for color picker dragging); the next non-live call records it.
+   */
+  setStyle(patch: DrawingStyle, live = false): void {
+    const d = this.selectedDrawing;
+    if (!d) return;
+    const before = this.styleBefore ?? this.snapshot();
+    this.styleBefore = live ? before : null;
+
+    const support = styleSupport(d.type);
+    const clean: DrawingStyle = {};
+    if (support.color && patch.color) clean.color = patch.color;
+    if (support.line && patch.width) clean.width = patch.width;
+    if (support.line && patch.lineStyle) clean.lineStyle = patch.lineStyle;
+    if (support.font && patch.fontSize) clean.fontSize = patch.fontSize;
+
+    this.drawings = this.drawings.map((x) => (x.id === d.id ? ({ ...x, ...clean } as Drawing) : x));
+    if (!live) {
+      this.pushHistory(before);
+      this.save();
+      this.styleDefaults = { ...this.styleDefaults, [d.type]: { ...this.styleDefaults[d.type], ...clean } };
+      saveStyleDefaults(this.styleDefaults);
+    }
+    this.changed();
+  }
+
+  /** Style a new drawing of this type starts with. */
+  private styleFor(type: DrawingType): { color: string } & DrawingStyle {
+    return { color: DEFAULT_COLORS[type], ...this.styleDefaults[type] };
   }
 
   /** Called when the active tool changes. */
@@ -132,6 +179,7 @@ export class DrawingManager implements DrawingSource {
       this.measure = null;
       this.undoStack = [];
       this.redoStack = [];
+      this.styleBefore = null;
     }
     this.changed();
   }
@@ -251,7 +299,7 @@ export class DrawingManager implements DrawingSource {
   // --- creating drawings -------------------------------------------------------------
 
   private makeTwoPoint(type: TwoPointType, p1: Point, p2: Point): TwoPointDrawing {
-    return { id: newId(), type, color: DEFAULT_COLORS[type], p1, p2 };
+    return { id: newId(), type, ...this.styleFor(type), p1, p2 };
   }
 
   private makePosition(type: 'long' | 'short', entry: Point, y: number): Drawing {
@@ -282,14 +330,17 @@ export class DrawingManager implements DrawingSource {
 
     const hostRect = host.getBoundingClientRect();
     const rect = this.container.getBoundingClientRect();
+    const style = existing ?? this.styleFor('text');
+    const fontSize = style.fontSize ?? DEFAULT_FONT_SIZE;
     const ta = document.createElement('textarea');
     ta.className = 'text-editor';
     ta.value = existing?.text ?? '';
     ta.placeholder = 'Text…';
     ta.style.left = `${rect.left - hostRect.left + pos.x}px`;
     ta.style.top = `${rect.top - hostRect.top + pos.y}px`;
-    ta.style.font = TEXT_FONT;
-    ta.style.color = existing?.color ?? DEFAULT_COLORS.text;
+    ta.style.font = textFont(fontSize);
+    ta.style.lineHeight = `${textLineHeight(fontSize)}px`;
+    ta.style.color = style.color;
     ta.rows = Math.max(1, ta.value.split('\n').length);
     host.append(ta);
     this.textEditor = ta;
@@ -312,7 +363,7 @@ export class DrawingManager implements DrawingSource {
             this.mutate(() => (this.drawings = this.drawings.map((d) => (d.id === existing.id ? { ...existing, text } : d))));
           }
         } else if (text) {
-          this.add({ id: newId(), type: 'text', color: DEFAULT_COLORS.text, p: point, text });
+          this.add({ id: newId(), type: 'text', ...this.styleFor('text'), p: point, text });
           return;
         }
       }
@@ -357,6 +408,7 @@ export class DrawingManager implements DrawingSource {
   private hitBody(d: Drawing, x: number, y: number): boolean {
     const pane = this.cc.paneSize();
     const reach = (pane.width + pane.height) * 4;
+    const LINE_TOLERANCE = BASE_TOLERANCE + (d.width ?? DEFAULT_WIDTH) / 2;
 
     switch (d.type) {
       case 'hline': {
@@ -370,7 +422,7 @@ export class DrawingManager implements DrawingSource {
       case 'text': {
         const p = this.xy(d.p);
         if (!p) return false;
-        const { width, height } = measureText(d.text);
+        const { width, height } = measureText(d.text, d.fontSize ?? DEFAULT_FONT_SIZE);
         return x >= p.x && x <= p.x + width && y >= p.y && y <= p.y + height;
       }
       case 'long':
@@ -454,8 +506,8 @@ export class DrawingManager implements DrawingSource {
       const pt = this.toPoint(x, y);
       if (!pt) return;
 
-      if (tool === 'hline') return this.add({ id: newId(), type: 'hline', color: DEFAULT_COLORS.hline, price: pt.price });
-      if (tool === 'vline') return this.add({ id: newId(), type: 'vline', color: DEFAULT_COLORS.vline, time: pt.time });
+      if (tool === 'hline') return this.add({ id: newId(), type: 'hline', ...this.styleFor('hline'), price: pt.price });
+      if (tool === 'vline') return this.add({ id: newId(), type: 'vline', ...this.styleFor('vline'), time: pt.time });
       if (tool === 'long' || tool === 'short') return this.add(this.makePosition(tool, pt, y));
       if (tool === 'text') return this.openTextEditor(pt);
 

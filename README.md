@@ -16,6 +16,7 @@ your machine.
   Fibonacci retracement, long/short position, text notes
 - Measure tool (`Shift` + click): price change, %, bars and time between two points
 - **No limit on the number of drawings**
+- Drawing styles: color, line width, solid/dashed/dotted lines, text size. Each tool remembers the last style you used
 - Magnet mode: snap points to a bar's open, high, low or close
 - Undo / redo, select, drag (whole drawing or one handle), delete with `Del`
 - Drawings are saved per symbol and stay in place when you switch timeframes
@@ -99,7 +100,6 @@ src/
 ## Roadmap
 
 - [ ] MT5 bridge (forex, indices and gold from your own broker)
-- [ ] Drawing colors and styles
 - [ ] More timeframes and chart types
 - [ ] Export/import drawings
 - [ ] Desktop app (Tauri) for Windows and macOS
