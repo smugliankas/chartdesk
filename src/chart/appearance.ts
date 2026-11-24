@@ -50,15 +50,9 @@ export function defaultAppearance(theme: Theme = 'dark'): Appearance {
   };
 }
 
-/** Switches theme: background and grid follow the theme, candle colors and toggles stay. */
+/** Switches the app theme only. The chart's own colors (background, grid, text, candles) stay as set. */
 export function withTheme(a: Appearance, theme: Theme): Appearance {
-  return {
-    ...a,
-    theme,
-    background: THEMES[theme].background,
-    gridColor: THEMES[theme].grid,
-    textColor: THEMES[theme].text,
-  };
+  return { ...a, theme };
 }
 
 const KEY = 'chartdesk:appearance';

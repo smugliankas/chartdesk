@@ -19,6 +19,7 @@ export function createSettingsDialog(
         <button type="button" value="dark">Dark</button>
         <button type="button" value="light">Light</button>
       </div>
+      <p class="hint">Changes the app's colors. The chart's colors below stay as you set them.</p>
 
       <h3>Candles</h3>
       <div class="settings-row">
