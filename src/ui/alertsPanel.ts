@@ -1,3 +1,4 @@
+import { formatClockTime } from '../format';
 import { alertTarget, type AlertManager, type PriceAlert } from '../alerts/AlertManager';
 import { notificationPermission, requestNotificationPermission } from '../alerts/notify';
 import { ICONS } from './tools';
@@ -110,7 +111,7 @@ export function createAlertsPanel({ button, manager, context, onAdd, onSelect }:
       const status = el(
         'span',
         'alert-status',
-        a.triggeredAt ? `Fired ${new Date(a.triggeredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Active',
+        a.triggeredAt ? `Fired ${formatClockTime(a.triggeredAt / 1000)}` : 'Active',
       );
       const actions = el('span', 'alert-actions');
       if (a.triggeredAt) {

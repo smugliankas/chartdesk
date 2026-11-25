@@ -1,7 +1,9 @@
 import type { ChartController } from './chart/ChartController';
+import { formatDateTime } from './format';
 import { barCloseTime } from './chart/countdown';
 import type { Candle, Timeframe } from './types';
 import { IS_MAC } from './platform';
+import { makeDraggable } from './ui/draggable';
 import { ICONS } from './ui/tools';
 
 /** Bars per second. */
@@ -87,6 +89,7 @@ export class Replay {
     const sep = () => Object.assign(document.createElement('span'), { className: 'rp-sep' });
     this.bar.append(selectButton, sep(), this.playButton, stepButton, this.speedSelect, sep(), this.dateLabel, sep(), exitButton);
     host.wrap.append(this.bar);
+    makeDraggable(this.bar, host.wrap, 'chartdesk:replayBarPos');
 
     // --- start-bar picker ---------------------------------------------------
     this.shadeEl = Object.assign(document.createElement('div'), { id: 'replayShade', className: 'hidden' });
@@ -293,7 +296,7 @@ export class Replay {
   private formatClock(): string {
     const last = this.full[this.shown - 1];
     if (!last) return '';
-    return new Date(last.time * 1000).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+    return formatDateTime(last.time);
   }
 
   // --- keys --------------------------------------------------------------------

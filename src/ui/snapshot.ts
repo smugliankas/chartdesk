@@ -1,3 +1,4 @@
+import { formatDateTime } from '../format';
 import type { IChartApi } from 'lightweight-charts';
 import type { Candle } from '../types';
 
@@ -64,7 +65,7 @@ export function renderSnapshot(chart: IChartApi, info: SnapshotInfo): HTMLCanvas
   }
 
   // Right side: the app name and when the image was made.
-  const when = new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  const when = formatDateTime(Date.now() / 1000);
   ctx.font = `12px ${FONT}`;
   ctx.textAlign = 'right';
   ctx.globalAlpha = 0.65;

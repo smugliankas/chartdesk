@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The style bar and the replay bar can be moved: drag the grip on their left. They stay where
+  you put them; double-click the grip to put them back.
+- Dates and numbers are always in English, like the rest of the app, whatever the computer's
+  language (a Turkish Mac showed "25 Kas 2026" in the replay bar).
 - Bar replay: the replay button in the top bar lets you pick a bar; everything after it
   disappears, and you play the chart forward from there (0.5× to 10× bars per second, Space to
   play or pause, ⇧→ for one bar). Switching timeframe or symbol keeps the replay's date and

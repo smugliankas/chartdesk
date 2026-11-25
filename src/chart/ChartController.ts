@@ -1,3 +1,4 @@
+import { formatDateTime, MONTHS } from '../format';
 import {
   CandlestickSeries,
   createChart,
@@ -359,8 +360,6 @@ function detectPrecision(data: Candle[]): number {
 
 // Axis labels in the user's local time zone.
 const pad = (n: number) => String(n).padStart(2, '0');
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
 function formatTick(time: number, type: TickMarkType): string {
   const d = new Date(time * 1000);
   switch (type) {
@@ -378,6 +377,5 @@ function formatTick(time: number, type: TickMarkType): string {
 }
 
 function formatFull(time: number): string {
-  const d = new Date(time * 1000);
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}  ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return formatDateTime(time);
 }

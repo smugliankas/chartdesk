@@ -18,6 +18,7 @@ import { ChartController } from './chart/ChartController';
 import { BarCountdown } from './chart/countdown';
 import { DrawingManager } from './drawings/DrawingManager';
 import { initDrawingStorage } from './drawings/storage';
+import { formatCount } from './format';
 import { Replay, REPLAY_STEP_KEYS } from './replay';
 import type { Drawing, ToolId } from './drawings/model';
 import { csv, getProvider, PROVIDERS, type DataProvider } from './providers';
@@ -29,6 +30,7 @@ import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
 import { canvasToBlob, copyImage, renderSnapshot, snapshotFileName } from './ui/snapshot';
 import { createDrawingsList } from './ui/drawingsList';
+import { makeDraggable } from './ui/draggable';
 import { AUTO_SCALE_KEYS, FULLSCREEN_KEYS, setupFullscreen } from './ui/fullscreen';
 import { createRightPanel } from './ui/rightPanel';
 import { createWatchlist } from './ui/watchlist';
@@ -266,7 +268,7 @@ function showReadyStatus(): void {
     setStatus(`${symbol} · ${TF_LABELS[timeframe]} · Replay${replay.atEnd ? ' · end of the data' : ''}`);
     return;
   }
-  setStatus(`${symbol} · ${TF_LABELS[timeframe]} · ${cc.barCount.toLocaleString()} bars`);
+  setStatus(`${symbol} · ${TF_LABELS[timeframe]} · ${formatCount(cc.barCount)} bars`);
 }
 
 function errorMessage(err: unknown): string {
@@ -525,6 +527,7 @@ const syncStyleBar = createStyleBar(chartWrap, drawings, {
     if (!hadActive) addDrawingAlert(d);
   },
 });
+makeDraggable($('styleBar'), chartWrap, 'chartdesk:styleBarPos');
 
 // Bell next to the price scale, following the cursor: click to add an alert at that price.
 const priceAlertButton = $<HTMLButtonElement>('priceAlertButton');

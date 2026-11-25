@@ -4,6 +4,7 @@
  */
 
 import type { Drawing } from './drawings/model';
+import { formatDateTime } from './format';
 import { allDrawings, DRAWINGS_PREFIX, flushDrawings, replaceDrawings } from './drawings/storage';
 
 const PREFIX = 'chartdesk:';
@@ -161,7 +162,7 @@ export function chooseAndRestoreBackup(onError: (message: string) => void): void
         `${s.alerts} alert${s.alerts === 1 ? '' : 's'}`,
       ];
       if (s.hasSettings) parts.push('settings');
-      const date = backup.exportedAt ? ` from ${new Date(backup.exportedAt).toLocaleString()}` : '';
+      const date = backup.exportedAt ? ` from ${formatDateTime(Date.parse(backup.exportedAt) / 1000)}` : '';
       const ok = confirm(
         `Restore this backup${date}?\n\n${parts.join(', ')}.\n\n` +
           'Drawings on these symbols, your alerts, watchlist and settings will be replaced by the ones in the backup. ' +
