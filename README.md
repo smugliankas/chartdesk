@@ -1,5 +1,7 @@
 # ChartDesk
 
+[![CI](https://github.com/smugliankas/chartdesk/actions/workflows/ci.yml/badge.svg)](https://github.com/smugliankas/chartdesk/actions/workflows/ci.yml)
+
 > A free, open-source charting app with **unlimited drawings**.
 > Runs on your own computer, and you bring your own data.
 
@@ -12,6 +14,7 @@ your machine.
 - Candlestick chart with volume; timeframes 1m, 5m, 15m, 30m, 1H, 4H, 1D, 1W and 1M
 - Older history loads automatically as you scroll left
 - Symbol search (Binance), live updates for crypto
+- Watchlist with live prices and 24h change; click a symbol to open it
 - Price alerts with sound, desktop notification and on-screen message; set from the bell menu,
   the bell next to the price scale, `Alt/⌥` + `A`, or on a horizontal or sloped line. Watched for all symbols while ChartDesk is open
 - Countdown to bar close in the last-price label (can be turned off in the settings)
@@ -22,6 +25,8 @@ your machine.
 - Drawing styles: color, line width, solid/dashed/dotted lines, text size. Each tool remembers the last style you used
 - Magnet mode: snap points to a bar's open, high, low or close
 - Undo / redo, select, drag (whole drawing or one handle), delete with `Del`
+- Right-click menu, copy / paste / duplicate, lock drawings, hide all drawings
+- Nudge with the arrow keys; `Shift` keeps lines horizontal, vertical or at 45°
 - Drawings are saved per symbol and stay in place when you switch timeframes
 - Log scale, auto-fit and "scroll to latest bar" controls; show/hide volume
 - Chart settings: dark and light themes, candle colors, borders and wicks, background, grid lines,
@@ -36,6 +41,10 @@ your machine.
 | `Alt/⌥` + `A` | Alert at the cursor price |
 | Hold `⌘` (Mac) / `Ctrl` | Magnet while held: crosshair and drawing points snap to open/high/low/close |
 | `Shift` + click | Measure |
+| Hold `Shift` while drawing a line | Horizontal, vertical or 45° |
+| `⌘/Ctrl` + `C` / `V` / `D` | Copy, paste, duplicate the selected drawing |
+| Arrow keys (`Shift` for ×10) | Move the selected drawing |
+| Right-click | Drawing or chart menu |
 | `Esc` | Cursor / cancel |
 | `Del` / `Backspace` | Delete selected drawing |
 | `⌘/Ctrl` + `Z`, `⌘/Ctrl` + `Shift` + `Z` | Undo, redo |
@@ -70,6 +79,13 @@ npm run dev
 
 Then open the address shown in the terminal (usually http://localhost:5173).
 
+To run the checks that also run on GitHub:
+
+```bash
+npm run typecheck
+npm test
+```
+
 ## Adding a data source
 
 Every data source implements one small interface, `DataProvider` in
@@ -84,6 +100,7 @@ interface DataProvider {
   getCandlesBefore?(symbol: string, tf: Timeframe, beforeTime: number): Promise<Candle[]>; // older history
   subscribe?(symbol: string, tf: Timeframe, onCandle: (c: Candle) => void): () => void;   // live updates
   searchSymbols?(query: string): Promise<SymbolInfo[]>;                                    // symbol search
+  watchQuotes?(symbols: string[], onQuote: (q: Quote) => void): () => void;              // watchlist prices
 }
 ```
 
@@ -101,7 +118,9 @@ src/
   chart/ChartController.ts   chart, series, time ↔ bar-index mapping
   drawings/                  drawing tools (model, geometry, rendering, mouse handling, storage)
   providers/                 data sources (Binance, CSV)
-  ui/                        toolbar icons and tool list, symbol search
+  alerts/                    price alerts (checking, drawing on the chart, notifications)
+  ui/                        toolbar, symbol search, watchlist, menus and dialogs
+tests/                       automated tests (npm test)
 ```
 
 ## Roadmap

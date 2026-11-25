@@ -1,5 +1,5 @@
 import type { Candle, Timeframe } from '../types';
-import type { DataProvider, SymbolInfo } from './types';
+import type { DataProvider, Quote, SymbolInfo } from './types';
 
 // Binance's public market-data-only endpoints. No API key or account needed.
 const REST_URL = 'https://data-api.binance.vision/api/v3';
@@ -74,6 +74,48 @@ export class BinanceProvider implements DataProvider {
       symbol: s.symbol,
       detail: `${s.change >= 0 ? '+' : ''}${s.change.toFixed(2)}%`,
     }));
+  }
+
+  watchQuotes(symbols: string[], onQuote: (q: Quote) => void): () => void {
+    const list = [...new Set(symbols.map((s) => s.toUpperCase()))];
+    if (list.length === 0) return () => {};
+    const toQuote = (symbol: string, last: string, open: string): Quote => ({
+      symbol,
+      price: Number(last),
+      changePct: Number(open) > 0 ? (Number(last) / Number(open) - 1) * 100 : 0,
+    });
+
+    // A snapshot first, so the list fills at once…
+    const query = encodeURIComponent(JSON.stringify(list));
+    getJson<MiniTicker[]>(`${REST_URL}/ticker/24hr?type=MINI&symbols=${query}`)
+      .then((rows) => rows.forEach((r) => onQuote(toQuote(r.symbol, r.lastPrice, r.openPrice))))
+      .catch(() => {
+        /* the stream below still fills it */
+      });
+
+    // …then one combined stream of 24h mini tickers for all symbols.
+    const streams = list.map((s) => `${s.toLowerCase()}@miniTicker`).join('/');
+    let ws: WebSocket | null = null;
+    let stopped = false;
+    let attempt = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const connect = () => {
+      ws = new WebSocket(`${WS_URL.replace(/\/ws$/, '')}/stream?streams=${streams}`);
+      ws.onmessage = (ev) => {
+        attempt = 0;
+        const d = (JSON.parse(String(ev.data)) as { data?: { s: string; c: string; o: string } }).data;
+        if (d) onQuote(toQuote(d.s, d.c, d.o));
+      };
+      ws.onclose = () => {
+        if (!stopped) retryTimer = setTimeout(connect, Math.min(30_000, 1000 * 2 ** attempt++));
+      };
+    };
+    connect();
+    return () => {
+      stopped = true;
+      clearTimeout(retryTimer);
+      ws?.close();
+    };
   }
 
   subscribe(symbol: string, tf: Timeframe, onCandle: (candle: Candle) => void): () => void {

@@ -200,6 +200,10 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     if (d && alerts) alerts.toggle(d);
   });
 
+  // --- lock -------------------------------------------------------------------
+  const lockGroup = group();
+  const lockButton = button(lockGroup, ICONS.unlock, 'Lock', () => drawings.toggleLock());
+
   // --- delete -----------------------------------------------------------------
   const deleteGroup = group();
   button(deleteGroup, ICONS.trash, 'Delete (Del)', () => drawings.deleteSelected()).classList.add('danger');
@@ -232,6 +236,11 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     fontGroup.classList.toggle('hidden', !support.font);
     alertGroup.classList.toggle('hidden', !alerts?.supports(d));
     alertButton.classList.toggle('active', !!alerts?.has(d.id));
+    lockButton.innerHTML = d.locked ? ICONS.lock : ICONS.unlock;
+    lockButton.classList.toggle('active', !!d.locked);
+    lockButton.dataset.tip = d.locked ? 'Unlock' : 'Lock (stops it from being moved)';
+    lockButton.removeAttribute('title');
+    for (const g of [colorGroup, zoneGroup, widthGroup, lineStyleGroup, fibGroup, fontGroup]) g.classList.toggle('locked', !!d.locked);
     if (!support.fib) levelsMenu.classList.add('hidden');
 
     lineColor.swatch.style.background = d.color;

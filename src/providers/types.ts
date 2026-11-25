@@ -1,5 +1,13 @@
 import type { Candle, Timeframe } from '../types';
 
+/** Latest price and 24-hour change of a symbol, for the watchlist. */
+export interface Quote {
+  symbol: string;
+  price: number;
+  /** Change over the last 24 hours, in percent. */
+  changePct: number;
+}
+
 /** One entry in the symbol search list. */
 export interface SymbolInfo {
   symbol: string;
@@ -40,4 +48,7 @@ export interface DataProvider {
 
   /** Optional symbol search for the symbol box. Best matches first. */
   searchSymbols?(query: string): Promise<SymbolInfo[]>;
+
+  /** Optional live quotes for several symbols at once (watchlist). Returns a function that stops it. */
+  watchQuotes?(symbols: string[], onQuote: (q: Quote) => void): () => void;
 }

@@ -37,6 +37,8 @@ export interface DrawingSource {
   readonly selectedId: string | null;
   /** Hidden while the text is being edited in place. */
   readonly editingId: string | null;
+  /** All drawings hidden ("hide drawings" toggle). */
+  readonly hidden: boolean;
   readonly measure: { p1: Point; p2: Point } | null;
 }
 
@@ -72,7 +74,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
   }
 
   updateAllViews(): void {
-    this.axisViews = this.source.drawings
+    this.axisViews = (this.source.hidden ? [] : this.source.drawings)
       .filter((d) => d.type === 'hline')
       .map((d) => {
         const y = this.cc.priceToY(d.price);
@@ -99,10 +101,12 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
 
   private draw(target: RenderTarget): void {
     target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
-      const { drawings, preview, selectedId, editingId, measure } = this.source;
+      const { drawings, preview, selectedId, editingId, measure, hidden } = this.source;
       const size = { w: mediaSize.width, h: mediaSize.height };
-      for (const d of drawings) {
-        if (d.id !== editingId) this.drawOne(ctx, size, d, d.id === selectedId);
+      if (!hidden) {
+        for (const d of drawings) {
+          if (d.id !== editingId) this.drawOne(ctx, size, d, d.id === selectedId);
+        }
       }
       if (preview) this.drawOne(ctx, size, preview, true);
       if (measure) this.drawMeasure(ctx, measure.p1, measure.p2);
@@ -222,7 +226,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         break;
     }
 
-    if (selected) {
+    if (selected && !d.locked) {
       ctx.setLineDash([]);
       for (const h of handlesOf(d)) {
         const p = this.xy(h.point);

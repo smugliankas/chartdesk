@@ -19,9 +19,11 @@ import type { Drawing, ToolId } from './drawings/model';
 import { csv, getProvider, PROVIDERS, type DataProvider } from './providers';
 import { TF_LABELS, TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from './types';
 import { createAlertsPanel } from './ui/alertsPanel';
+import { showContextMenu, type MenuEntry } from './ui/contextMenu';
 import { createSettingsDialog } from './ui/settingsDialog';
 import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
+import { createWatchlist } from './ui/watchlist';
 import { installTooltips } from './ui/tooltips';
 import { ALT, HOLD, ICONS, MOD, TOOLBAR, toolTitle } from './ui/tools';
 
@@ -54,13 +56,14 @@ interface Settings {
   timeframe: Timeframe;
   symbols: Record<string, string>;
   magnet: boolean;
+  drawingsHidden: boolean;
 }
 
 const SETTINGS_KEY = 'chartdesk:settings';
 const OLD_SETTINGS_KEY = 'chart-app:settings'; // before the project was named ChartDesk
 
 function loadSettings(): Settings {
-  const fallback: Settings = { provider: 'binance', timeframe: '1h', symbols: { binance: 'BTCUSDT' }, magnet: false };
+  const fallback: Settings = { provider: 'binance', timeframe: '1h', symbols: { binance: 'BTCUSDT' }, magnet: false, drawingsHidden: false };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY) ?? localStorage.getItem(OLD_SETTINGS_KEY);
     return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<Settings>) } : fallback;
@@ -101,6 +104,7 @@ function syncCountdown(): void {
   countdown.setTimeframe(cc.appearance.countdown ? liveTimeframe : null);
 }
 drawings.setMagnet(settings.magnet);
+drawings.setHidden(settings.drawingsHidden);
 
 // --- appearance ---------------------------------------------------------------
 
@@ -245,6 +249,7 @@ const magnetButton = sidebarButton(ICONS.magnet, `Magnet: snap to open/high/low/
   settings.magnet = drawings.magnetOn;
   saveSettings();
 });
+const hideButton = sidebarButton(ICONS.eye, 'Hide all drawings', () => drawings.setHidden(!drawings.hidden));
 const deleteButton = sidebarButton(ICONS.trash, 'Delete selected drawing (Del)', () => drawings.deleteSelected());
 const clearButton = sidebarButton(ICONS.trashAll, 'Remove all drawings on this symbol', () => {
   if (drawings.drawings.length && confirm(`Remove all ${drawings.drawings.length} drawings on ${symbol}?`)) {
@@ -298,12 +303,13 @@ function addDrawingAlert(d: Drawing): void {
   setStatus(`Alert set: ${symbol} crossing the ${alertTarget(a)}`);
 }
 
-function selectAlertSymbol(a: PriceAlert): void {
-  if (a.providerId !== provider.id) {
-    provider = getProvider(a.providerId);
+/** Opens a symbol on the chart, switching the data source if needed. */
+function selectSymbol(providerId: string, newSymbol: string): void {
+  if (providerId !== provider.id) {
+    provider = getProvider(providerId);
     settings.provider = provider.id;
   }
-  symbol = a.symbol;
+  symbol = newSymbol;
   if (provider.freeSymbolInput) settings.symbols[provider.id] = symbol;
   saveSettings();
   syncProviderUi();
@@ -315,7 +321,7 @@ const alertsPanel = createAlertsPanel({
   manager: alerts,
   context: () => ({ canAlert: !!provider.subscribe && cc.barCount > 0, price: cc.lastCandle?.close, format: (p) => cc.formatPrice(p) }),
   onAdd: (price) => addAlertAt(price),
-  onSelect: selectAlertSymbol,
+  onSelect: (a: PriceAlert) => selectSymbol(a.providerId, a.symbol),
 });
 
 alerts.onTrigger((a, price) => {
@@ -429,6 +435,14 @@ drawings.onChange(() => {
   undoButton.disabled = !drawings.canUndo;
   redoButton.disabled = !drawings.canRedo;
   deleteButton.disabled = !drawings.selectedId;
+  hideButton.innerHTML = drawings.hidden ? ICONS.eyeOff : ICONS.eye;
+  hideButton.classList.toggle('active', drawings.hidden);
+  hideButton.dataset.tip = drawings.hidden ? 'Show drawings' : 'Hide all drawings';
+  hideButton.removeAttribute('title');
+  if (settings.drawingsHidden !== drawings.hidden) {
+    settings.drawingsHidden = drawings.hidden;
+    saveSettings();
+  }
   clearButton.disabled = drawings.drawings.length === 0;
   magnetButton.classList.toggle('active', drawings.magnetOn);
 });
@@ -449,6 +463,72 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     drawings.setTool(t.id);
   }
+});
+
+// --- right-click menu ------------------------------------------------------------------
+
+chartEl.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const { clientX, clientY } = e;
+  const d = drawings.currentTool === 'cursor' ? drawings.selectAt(clientX, clientY) : null;
+
+  if (d) {
+    const alertable = ALERTABLE.includes(d.type);
+    const hasAlert = alerts.all.some((a) => a.drawingId === d.id && !a.triggeredAt);
+    const entries: MenuEntry[] = [
+      { label: 'Duplicate', shortcut: `${MOD}D`, action: () => drawings.duplicateSelected() },
+      { label: 'Copy', shortcut: `${MOD}C`, action: () => drawings.copySelected() },
+      { label: d.locked ? 'Unlock' : 'Lock', action: () => drawings.toggleLock(d.id) },
+      null,
+      { label: 'Bring to front', action: () => drawings.bringToFront(d.id) },
+      { label: 'Send to back', action: () => drawings.sendToBack(d.id) },
+    ];
+    if (alertable) {
+      entries.push(null, {
+        label: hasAlert ? 'Remove alert' : 'Add alert on this line',
+        disabled: !provider.subscribe,
+        action: () => {
+          const existing = alerts.all.filter((a) => a.drawingId === d.id);
+          existing.forEach((a) => alerts.remove(a.id));
+          if (!hasAlert) addDrawingAlert(d);
+        },
+      });
+    }
+    entries.push(null, { label: 'Delete', shortcut: 'Del', danger: true, action: () => drawings.deleteSelected() });
+    showContextMenu(clientX, clientY, entries);
+    return;
+  }
+
+  const rect = chartEl.getBoundingClientRect();
+  const price = cc.yToPrice(clientY - rect.top);
+  showContextMenu(clientX, clientY, [
+    {
+      label: price === null ? 'Add alert' : `Add alert at ${cc.formatPrice(price)}`,
+      shortcut: `${ALT}A`,
+      disabled: price === null || !provider.subscribe,
+      action: () => price !== null && addAlertAt(price),
+    },
+    { label: 'Paste', shortcut: `${MOD}V`, disabled: !drawings.canPaste, action: () => drawings.paste() },
+    null,
+    { label: drawings.hidden ? 'Show drawings' : 'Hide all drawings', action: () => drawings.setHidden(!drawings.hidden) },
+    {
+      label: 'Reset chart view',
+      action: () => {
+        cc.setAutoScale(true);
+        cc.scrollToRealtime();
+        syncControls();
+      },
+    },
+    null,
+    {
+      label: 'Remove all drawings',
+      danger: true,
+      disabled: drawings.drawings.length === 0,
+      action: () => {
+        if (confirm(`Remove all ${drawings.drawings.length} drawings on ${symbol}?`)) drawings.clearAll();
+      },
+    },
+  ]);
 });
 
 // --- chart controls (bottom right of the chart) -----------------------------------------
@@ -524,6 +604,7 @@ async function load(): Promise<void> {
 
     cc.setData(candles, TF_SECONDS[timeframe]);
     drawings.setStorageKey(`${provider.id}:${symbol}`);
+    watchlist.sync();
     showLegend(cc.lastCandle);
     showReadyStatus();
     syncControls();
@@ -600,6 +681,17 @@ const settingsButton = $<HTMLButtonElement>('settings');
 settingsButton.innerHTML = ICONS.settings;
 settingsButton.addEventListener('click', () => settingsDialog.open());
 
+const watchlistButton = $<HTMLButtonElement>('watchlistToggle');
+watchlistButton.innerHTML = ICONS.list;
+const watchlist = createWatchlist({
+  host: $('body'),
+  toggleButton: watchlistButton,
+  providerId: 'binance',
+  current: () => ({ providerId: provider.id, symbol }),
+  onSelect: (item) => selectSymbol(item.providerId, item.symbol),
+  onToggle: () => requestAnimationFrame(syncControls),
+});
+
 const aboutButton = $<HTMLButtonElement>('about');
 aboutButton.innerHTML = ICONS.info;
 aboutButton.addEventListener('click', () => aboutDialog.showModal());
@@ -612,6 +704,10 @@ const shortcuts: [string, string][] = [
   ['Shift + click', 'Measure'],
   [`${ALT}A`, 'Alert at the cursor price'],
   [`Hold ${HOLD}`, 'Magnet while held (snap to open/high/low/close)'],
+  ['Shift while drawing', 'Keep a line horizontal, vertical or at 45°'],
+  [`${MOD}C / ${MOD}V / ${MOD}D`, 'Copy, paste, duplicate drawing'],
+  ['Arrow keys', 'Move the selected drawing (Shift: faster)'],
+  ['Right-click', 'Drawing and chart menu'],
   ['Esc', 'Cursor / cancel'],
   ['Del', 'Delete selected drawing'],
   [`${MOD}Z`, 'Undo'],

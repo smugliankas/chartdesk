@@ -10,6 +10,8 @@ import {
   fibLevelsOf,
   fibPrice,
   fibShowsTrendLine,
+  isStraightLineType,
+  isTwoPoint,
   isTwoPointType,
   measureText,
   newId,
@@ -53,6 +55,7 @@ export class DrawingManager implements DrawingSource {
   selectedId: string | null = null;
   editingId: string | null = null;
   measure: { p1: Point; p2: Point } | null = null;
+  hidden = false;
 
   private tool: ToolId = 'cursor';
   private pending: Point | null = null;
@@ -69,6 +72,11 @@ export class DrawingManager implements DrawingSource {
   private styleDefaults = loadStyleDefaults();
   /** Snapshot taken when a live style preview (e.g. dragging in the color picker) starts. */
   private styleBefore: Drawing[] | null = null;
+  /** Copied drawing (⌘C), pasted with ⌘V. Shared across symbols. */
+  private clipboard: Drawing | null = null;
+  /** Arrow-key nudges within a short time are one undo step. */
+  private nudgeBefore: Drawing[] | null = null;
+  private nudgeTimer: ReturnType<typeof setTimeout> | undefined;
 
   private readonly primitive: DrawingsPrimitive;
   private readonly listeners = { tool: [] as ((t: ToolId) => void)[], change: [] as (() => void)[] };
@@ -182,6 +190,7 @@ export class DrawingManager implements DrawingSource {
   }
 
   setTool(tool: ToolId): void {
+    if (tool !== 'cursor' && tool !== 'measure' && this.hidden) this.setHidden(false);
     this.tool = tool;
     this.pending = null;
     this.preview = null;
@@ -215,6 +224,92 @@ export class DrawingManager implements DrawingSource {
       this.redoStack = [];
       this.styleBefore = null;
     }
+    this.changed();
+  }
+
+  /** Hides or shows all drawings (they stay saved). */
+  setHidden(hidden: boolean): void {
+    this.hidden = hidden;
+    if (hidden) this.selectedId = null;
+    this.changed();
+  }
+
+  get canPaste(): boolean {
+    return this.clipboard !== null;
+  }
+
+  copySelected(): void {
+    const d = this.selectedDrawing;
+    if (d) this.clipboard = structuredClone(d);
+  }
+
+  /** Pastes the copied drawing a few bars to the right of the original. */
+  paste(): void {
+    if (this.clipboard) this.insertCopy(this.clipboard);
+  }
+
+  duplicateSelected(): void {
+    const d = this.selectedDrawing;
+    if (d) this.insertCopy(d);
+  }
+
+  private insertCopy(source: Drawing): void {
+    const copy = moveWhole(structuredClone(source), (t) => this.cc.logicalToTime(this.cc.timeToLogical(t) + 5), 0);
+    copy.id = newId();
+    copy.locked = false;
+    if (this.hidden) this.hidden = false;
+    this.mutate(() => this.drawings.push(copy));
+    this.selectedId = copy.id;
+    this.changed();
+  }
+
+  toggleLock(id = this.selectedId): void {
+    if (!id) return;
+    this.mutate(() => {
+      this.drawings = this.drawings.map((d) => (d.id === id ? { ...d, locked: !d.locked } : d));
+    });
+  }
+
+  bringToFront(id = this.selectedId): void {
+    const d = this.drawings.find((x) => x.id === id);
+    if (!d) return;
+    this.mutate(() => (this.drawings = [...this.drawings.filter((x) => x !== d), d]));
+  }
+
+  sendToBack(id = this.selectedId): void {
+    const d = this.drawings.find((x) => x.id === id);
+    if (!d) return;
+    this.mutate(() => (this.drawings = [d, ...this.drawings.filter((x) => x !== d)]));
+  }
+
+  /** Selects the drawing under a screen position (e.g. for a right-click menu) and returns it. */
+  selectAt(clientX: number, clientY: number): Drawing | null {
+    const rect = this.container.getBoundingClientRect();
+    const hit = this.hitTest(clientX - rect.left, clientY - rect.top);
+    this.selectedId = hit?.id ?? null;
+    this.changed();
+    return this.selectedDrawing;
+  }
+
+  /** Moves the selected drawing by whole bars and/or screen pixels (arrow keys). */
+  nudge(bars: number, pixels: number): void {
+    const d = this.selectedDrawing;
+    if (!d || d.locked) return;
+    const y0 = this.cc.priceToY(0) ?? 0;
+    const p0 = this.cc.yToPrice(y0);
+    const p1 = this.cc.yToPrice(y0 - pixels);
+    const dPrice = p0 === null || p1 === null ? 0 : p1 - p0;
+    // Several presses in a row are a single undo step.
+    this.nudgeBefore ??= this.snapshot();
+    clearTimeout(this.nudgeTimer);
+    this.nudgeTimer = setTimeout(() => {
+      if (this.nudgeBefore) this.pushHistory(this.nudgeBefore);
+      this.nudgeBefore = null;
+      this.changed();
+    }, 600);
+    const moved = moveWhole(d, (t) => this.cc.logicalToTime(this.cc.timeToLogical(t) + bars), dPrice);
+    this.drawings = this.drawings.map((x) => (x.id === d.id ? moved : x));
+    this.save();
     this.changed();
   }
 
@@ -291,6 +386,7 @@ export class DrawingManager implements DrawingSource {
   }
 
   private add(d: Drawing): void {
+    if (this.hidden) this.hidden = false;
     this.mutate(() => this.drawings.push(d));
     this.setTool('cursor');
     this.selectedId = d.id;
@@ -328,6 +424,29 @@ export class DrawingManager implements DrawingSource {
     const x = this.cc.timeToX(p.time);
     const y = this.cc.priceToY(p.price);
     return x === null || y === null ? null : { x, y };
+  }
+
+  /**
+   * The point under (x, y), moved so the line from `anchor` is horizontal, vertical or at
+   * 45° on screen, whichever is closest to where the mouse is.
+   */
+  private constrain(anchor: Point, x: number, y: number): Point | null {
+    const a = this.xy(anchor);
+    if (!a) return this.toPoint(x, y, false);
+    const dx = x - a.x;
+    const dy = y - a.y;
+    const angle = Math.abs(Math.atan2(dy, dx) * (180 / Math.PI)); // 0..180
+    const fromHorizontal = Math.min(angle, 180 - angle);
+    if (fromHorizontal < 22.5) {
+      const p = this.toPoint(x, a.y, false);
+      return p && { time: p.time, price: anchor.price };
+    }
+    if (fromHorizontal > 67.5) {
+      const p = this.toPoint(a.x, y, false);
+      return p && { time: anchor.time, price: p.price };
+    }
+    const len = Math.max(Math.abs(dx), Math.abs(dy));
+    return this.toPoint(a.x + Math.sign(dx) * len, a.y + Math.sign(dy) * len, false);
   }
 
   // --- creating drawings -------------------------------------------------------------
@@ -428,10 +547,11 @@ export class DrawingManager implements DrawingSource {
   // --- hit testing ------------------------------------------------------------------
 
   private hitTest(x: number, y: number): { id: string; part: Part } | null {
+    if (this.hidden) return null;
     // Selected drawing first, so its handles win over drawings underneath.
     const order = [...this.drawings].reverse().sort((a, b) => Number(b.id === this.selectedId) - Number(a.id === this.selectedId));
     for (const d of order) {
-      for (const h of handlesOf(d)) {
+      for (const h of d.locked ? [] : handlesOf(d)) {
         const p = this.xy(h.point);
         if (p && Math.hypot(x - p.x, y - p.y) <= HANDLE_RADIUS) return { id: d.id, part: h.part };
       }
@@ -553,7 +673,8 @@ export class DrawingManager implements DrawingSource {
           this.preview = this.makeTwoPoint(tool, pt, pt);
           this.redraw();
         } else {
-          this.add(this.makeTwoPoint(tool, this.pending, pt));
+          const end = e.shiftKey && isStraightLineType(tool) ? (this.constrain(this.pending, x, y) ?? pt) : pt;
+          this.add(this.makeTwoPoint(tool, this.pending, end));
         }
       }
       return;
@@ -575,7 +696,7 @@ export class DrawingManager implements DrawingSource {
     const original = this.drawings.find((d) => d.id === hit.id);
     const logical = this.cc.xToLogical(x);
     const price = this.cc.yToPrice(y);
-    if (original && logical !== null && price !== null) {
+    if (original && !original.locked && logical !== null && price !== null) {
       this.drag = {
         id: hit.id,
         part: hit.part,
@@ -605,7 +726,7 @@ export class DrawingManager implements DrawingSource {
     }
 
     if (this.pending && isTwoPointType(this.tool)) {
-      const pt = this.toPoint(x, y);
+      const pt = e.shiftKey && isStraightLineType(this.tool) ? this.constrain(this.pending, x, y) : this.toPoint(x, y);
       if (pt) {
         this.preview = this.makeTwoPoint(this.tool, this.pending, pt);
         this.redraw();
@@ -615,7 +736,8 @@ export class DrawingManager implements DrawingSource {
 
     if (this.tool === 'cursor') {
       const hit = this.hitTest(x, y);
-      this.container.style.cursor = !hit ? '' : hit.part === 'body' ? 'move' : 'pointer';
+      const locked = hit && this.drawings.find((d) => d.id === hit.id)?.locked;
+      this.container.style.cursor = !hit ? '' : locked ? 'default' : hit.part === 'body' ? 'move' : 'pointer';
     }
   };
 
@@ -646,9 +768,12 @@ export class DrawingManager implements DrawingSource {
       const shiftTime = (t: number) => this.cc.logicalToTime(this.cc.timeToLogical(t) + dl);
       next = moveWhole(drag.original, shiftTime, price - drag.startPrice);
     } else {
-      const pt = this.toPoint(x, y);
+      const o = drag.original;
+      // Shift keeps a line horizontal, vertical or at 45° around its other end.
+      const anchor = e.shiftKey && isStraightLineType(o.type) && isTwoPoint(o) ? (drag.part === 'p1' ? o.p2 : o.p1) : null;
+      const pt = anchor ? this.constrain(anchor, x, y) : this.toPoint(x, y);
       if (!pt) return;
-      next = moveHandle(drag.original, drag.part, pt);
+      next = moveHandle(o, drag.part, pt);
     }
 
     this.drawings = this.drawings.map((d) => (d.id === drag.id ? next : d));
@@ -681,6 +806,22 @@ export class DrawingManager implements DrawingSource {
     } else if (mod && e.code === 'KeyY') {
       e.preventDefault();
       this.redo();
+    } else if (mod && e.code === 'KeyC' && this.selectedId) {
+      e.preventDefault();
+      this.copySelected();
+    } else if (mod && e.code === 'KeyV' && this.clipboard) {
+      e.preventDefault();
+      this.paste();
+    } else if (mod && e.code === 'KeyD' && this.selectedId) {
+      e.preventDefault(); // also stops the browser's "bookmark this page"
+      this.duplicateSelected();
+    } else if (this.selectedId && !mod && e.key.startsWith('Arrow')) {
+      e.preventDefault();
+      const big = e.shiftKey;
+      if (e.key === 'ArrowLeft') this.nudge(big ? -10 : -1, 0);
+      else if (e.key === 'ArrowRight') this.nudge(big ? 10 : 1, 0);
+      else if (e.key === 'ArrowUp') this.nudge(0, big ? 10 : 1);
+      else if (e.key === 'ArrowDown') this.nudge(0, big ? -10 : -1);
     } else if (e.key === 'Escape') {
       this.measure = null;
       this.selectedId = null;

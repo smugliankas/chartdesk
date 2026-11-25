@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Watchlist: a panel on the right (list button in the top bar) with live price and 24h change
+  for your symbols. Click a row to open it on the chart; add symbols with the search box,
+  remove them with ×. Prices flash green or red when they change. Saved between visits.
+- Right-click menu: on a drawing (duplicate, copy, lock, bring to front, send to back, alert,
+  delete) and on the empty chart (alert at that price, paste, hide drawings, reset the view,
+  remove all drawings).
+- Copy, paste and duplicate drawings with ⌘/Ctrl + C, V and D.
+- Lock a drawing (style bar or right-click) so it can't be moved or changed by accident.
+- Hide all drawings with the eye button in the sidebar; picking a drawing tool shows them again.
+- Arrow keys move the selected drawing by one bar (left/right) or one pixel (up/down); with
+  Shift, by ten. A series of presses is undone in one step.
+- Hold Shift while drawing a trend line, ray or extended line, or while dragging one of its
+  ends, to keep it horizontal, vertical or at 45°.
+- Automated tests (Vitest) for the CSV reader, drawing geometry, Fibonacci levels, bar
+  countdown, alert levels and color helpers. GitHub Actions runs type checking, the tests and
+  a build on every push and pull request.
+
 - Price alerts: get a sound, a desktop notification and an on-screen message when the price
   crosses a level. Set one from the bell menu, with the bell that follows the cursor next to
   the price scale, with ⌥/Alt + A at the cursor price, or on a selected horizontal line, trend

@@ -12,6 +12,8 @@ interface Base {
   /** Line width in pixels. Missing in drawings saved before styles existed: use DEFAULT_WIDTH. */
   width?: number;
   lineStyle?: LineStyle;
+  /** Locked drawings can be selected but not moved or reshaped. */
+  locked?: boolean;
 }
 
 export type TrendLine = Base & { type: 'trend'; p1: Point; p2: Point };
@@ -59,6 +61,11 @@ export const TWO_POINT_TYPES: readonly TwoPointType[] = ['trend', 'ray', 'extend
 
 export function isTwoPointType(t: ToolId): t is TwoPointType {
   return (TWO_POINT_TYPES as readonly string[]).includes(t);
+}
+
+/** Lines that Shift can keep horizontal, vertical or at 45°. */
+export function isStraightLineType(t: ToolId): t is 'trend' | 'ray' | 'extended' {
+  return t === 'trend' || t === 'ray' || t === 'extended';
 }
 
 export function isTwoPoint(d: Drawing): d is TwoPointDrawing {
