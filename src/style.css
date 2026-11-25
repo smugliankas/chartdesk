@@ -8,10 +8,10 @@
   --accent: #4f8cff;
   --up: #26a69a;
   --down: #ef5350;
-  --active-bg: linear-gradient(180deg, rgba(79, 140, 255, 0.3), rgba(79, 140, 255, 0.1));
-  --active-border: rgba(79, 140, 255, 0.5);
-  --active-text: #dbe7ff;
-  --active-glow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 10px rgba(79, 140, 255, 0.14);
+  --active-bg: linear-gradient(180deg, rgba(79, 140, 255, 0.42), rgba(79, 140, 255, 0.18));
+  --active-border: rgba(110, 160, 255, 0.85);
+  --active-text: #ffffff;
+  --active-glow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 12px rgba(79, 140, 255, 0.22);
   color-scheme: dark;
 }
 
@@ -22,8 +22,8 @@ body.light {
   --hover: #eceff4;
   --text: #131722;
   --muted: #6a6f7d;
-  --active-bg: linear-gradient(180deg, rgba(79, 140, 255, 0.2), rgba(79, 140, 255, 0.07));
-  --active-border: rgba(41, 98, 255, 0.45);
+  --active-bg: linear-gradient(180deg, rgba(79, 140, 255, 0.28), rgba(79, 140, 255, 0.1));
+  --active-border: rgba(41, 98, 255, 0.75);
   --active-text: #1d4ed8;
   --active-glow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 8px rgba(41, 98, 255, 0.1);
   color-scheme: light;
@@ -1103,4 +1103,24 @@ body.light #timeframes {
   border-color: var(--active-border);
   color: var(--active-text);
   box-shadow: var(--active-glow);
+}
+
+/* On/off toggles on the chart: "off" is clearly dimmed, "on" clearly lit. */
+#chartControls button {
+  color: var(--muted);
+  border-color: transparent;
+  font-weight: 500;
+}
+
+#chartControls button:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+#chartControls button.active,
+#chartControls button.active:hover:not(:disabled) {
+  color: var(--active-text);
+  border-color: var(--active-border);
+  box-shadow: var(--active-glow);
+  font-weight: 600;
 }
