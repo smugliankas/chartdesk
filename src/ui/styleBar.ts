@@ -89,6 +89,9 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
   palette.append(custom);
 
   // Close the palette on any click outside it.
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') palette.classList.add('hidden');
+  });
   document.addEventListener('mousedown', (e) => {
     if (!colorGroup.contains(e.target as Node)) palette.classList.add('hidden');
   });

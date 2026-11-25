@@ -39,6 +39,9 @@ export function createAlertsPanel({ button, manager, context, onAdd, onSelect }:
   document.addEventListener('mousedown', (e) => {
     if (!panel.contains(e.target as Node) && !button.contains(e.target as Node)) panel.classList.add('hidden');
   });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') panel.classList.add('hidden');
+  });
 
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) => {
     const e = document.createElement(tag);

@@ -29,7 +29,7 @@ export function attachSymbolSearch(input: HTMLInputElement, { search, onPick }: 
         const row = document.createElement('div');
         row.className = 'symbol-item' + (i === active ? ' active' : '');
         const name = document.createElement('span');
-        name.textContent = it.symbol;
+        appendHighlighted(name, it.symbol, input.value.trim());
         row.append(name);
         if (it.detail) {
           const detail = document.createElement('span');
@@ -105,4 +105,16 @@ export function attachSymbolSearch(input: HTMLInputElement, { search, onPick }: 
       input.blur();
     }
   });
+}
+
+/** Appends `text`, with the first case-insensitive match of `query` wrapped in <mark>. */
+function appendHighlighted(parent: HTMLElement, text: string, query: string): void {
+  const i = query ? text.toUpperCase().indexOf(query.toUpperCase()) : -1;
+  if (i < 0) {
+    parent.textContent = text;
+    return;
+  }
+  const mark = document.createElement('mark');
+  mark.textContent = text.slice(i, i + query.length);
+  parent.append(text.slice(0, i), mark, text.slice(i + query.length));
 }

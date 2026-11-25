@@ -10,6 +10,11 @@
   alerts can be turned on again or cleared. Hover an alert line to see its price and a ×
   to delete it; drag the line to move the alert. Alerts use the chart's text color.
 
+- Polish: menus, lists, the style bar and dialogs open with short animations; buttons react
+  to hover and clicks; fast tooltips that show keyboard shortcuts as keys; a thin loading bar
+  and a dimmed chart while data loads; matches highlighted in symbol search; Esc closes menus.
+  Animations are turned off when the system asks for reduced motion.
+
 ## v0.2.0
 
 Customization, chart settings and a few TradingView favorites.

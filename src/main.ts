@@ -22,6 +22,7 @@ import { createAlertsPanel } from './ui/alertsPanel';
 import { createSettingsDialog } from './ui/settingsDialog';
 import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
+import { installTooltips } from './ui/tooltips';
 import { ALT, ICONS, MOD, TOOLBAR, toolTitle } from './ui/tools';
 
 // --- elements ----------------------------------------------------------------
@@ -487,6 +488,21 @@ cc.chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
 
 // --- loading -------------------------------------------------------------------
 
+const loadingBar = document.createElement('div');
+loadingBar.id = 'loadingBar';
+chartWrap.append(loadingBar);
+let pendingLoads = 0;
+
+/** Shows the loading bar until the returned function is called. */
+function startLoading(): () => void {
+  pendingLoads++;
+  loadingBar.classList.add('active');
+  return () => {
+    pendingLoads = Math.max(0, pendingLoads - 1);
+    if (pendingLoads === 0) loadingBar.classList.remove('active');
+  };
+}
+
 async function load(): Promise<void> {
   if (!symbol) return;
   const seq = ++loadSeq;
@@ -498,6 +514,8 @@ async function load(): Promise<void> {
   historyDone = false;
   syncTimeframeUi();
   setStatus(`Loading ${symbol} ${TF_LABELS[timeframe]}…`);
+  const done = startLoading();
+  if (cc.barCount > 0) chartEl.classList.add('loading');
 
   try {
     const candles = await provider.getCandles(symbol, timeframe);
@@ -522,6 +540,9 @@ async function load(): Promise<void> {
     }
   } catch (err) {
     if (seq === loadSeq) setStatus(errorMessage(err), true);
+  } finally {
+    done();
+    if (seq === loadSeq) chartEl.classList.remove('loading');
   }
 }
 
@@ -532,6 +553,7 @@ async function loadOlder(): Promise<void> {
   const seq = loadSeq;
   historyLoading = true;
   setStatus('Loading older bars…');
+  const done = startLoading();
   try {
     const older = await provider.getCandlesBefore(symbol, timeframe, before);
     if (seq !== loadSeq) return;
@@ -540,6 +562,7 @@ async function loadOlder(): Promise<void> {
   } catch (err) {
     if (seq === loadSeq) setStatus(errorMessage(err), true);
   } finally {
+    done();
     if (seq === loadSeq) historyLoading = false;
   }
 }
@@ -602,6 +625,8 @@ for (const [key, what] of shortcuts) {
 }
 
 // --- start ----------------------------------------------------------------------------
+
+installTooltips();
 
 syncProviderUi();
 syncTimeframeUi();
