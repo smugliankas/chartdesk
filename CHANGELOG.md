@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- The alert bell next to the price scale glides with the mouse: before, it stood still while
+  the mouse was on it and then jumped (a couple of dollars at a time on gold), so some prices
+  couldn't be picked.
+- "Alert set: …" in the status line is a short confirmation now: it goes away after a few
+  seconds, and at once if that alert is deleted or moved.
 - One symbol search for every source: type "xau", "eur" or "btc" and the list shows matches
   from Binance, Bybit TradFi and Binance TradFi together, each with its source on the right.
   Picking one switches the chart to that source on its own; no need to change the data source

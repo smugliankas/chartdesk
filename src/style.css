@@ -857,9 +857,18 @@ button.link:hover:not(:disabled) {
   height: 14px;
 }
 
-.price-alert:hover:not(:disabled) {
+/* The chart gets the mouse through the bell (see main.ts); .hover stands in for :hover. */
+.price-alert {
+  pointer-events: none;
+}
+
+.price-alert.hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+#chartWrap.over-alert-button canvas {
+  cursor: pointer !important;
 }
 
 /* Label shown when hovering an alert line: price and a delete button. */

@@ -425,8 +425,9 @@ const alertsPrimitive = new AlertsPrimitive(cc, () => alerts.forSymbol(provider.
 cc.candles.attachPrimitive(alertsPrimitive);
 unlockAudioOnFirstInteraction();
 
-/** Price under the mouse on the chart, for ⌥A. */
+/** Price under the mouse on the chart, for ⌥A, and its height on the chart. */
 let crosshairPrice: number | null = null;
+let crosshairY: number | null = null;
 
 function canAlert(): boolean {
   if (provider.subscribe) return true;
@@ -434,12 +435,31 @@ function canAlert(): boolean {
   return false;
 }
 
+// "Alert set: …" in the status line is a short confirmation: it goes back to the usual line
+// after a few seconds, or right away when that alert is deleted or moved.
+let alertNote: { id: string; priceText: string; text: string } | null = null;
+let alertNoteTimer: ReturnType<typeof setTimeout> | undefined;
+
+function noteAlertSet(a: PriceAlert, text: string): void {
+  setStatus(text);
+  alertNote = { id: a.id, priceText: a.priceText, text };
+  clearTimeout(alertNoteTimer);
+  alertNoteTimer = setTimeout(endAlertNote, 4000);
+}
+
+function endAlertNote(): void {
+  clearTimeout(alertNoteTimer);
+  // Only if the line still shows the note (not an error or another message since).
+  if (alertNote && statusEl.textContent === alertNote.text) showReadyStatus();
+  alertNote = null;
+}
+
 /** Alert at a fixed price. */
 function addAlertAt(price: number, drawingId?: string): void {
   if (!canAlert()) return;
-  alerts.add({ providerId: provider.id, symbol, price, priceText: cc.formatPrice(price), currentPrice: cc.lastCandle?.close, drawingId });
+  const a = alerts.add({ providerId: provider.id, symbol, price, priceText: cc.formatPrice(price), currentPrice: cc.lastCandle?.close, drawingId });
   void requestNotificationPermission();
-  setStatus(`Alert set: ${symbol} crossing ${cc.formatPrice(price)}`);
+  noteAlertSet(a, `Alert set: ${symbol} crossing ${a.priceText}`);
 }
 
 const ALERTABLE: readonly Drawing['type'][] = ['hline', 'hray', 'cross', 'trend', 'ray', 'extended', 'arrow'];
@@ -468,7 +488,7 @@ function addDrawingAlert(d: Drawing): void {
     line,
   });
   void requestNotificationPermission();
-  setStatus(`Alert set: ${symbol} crossing the ${alertTarget(a)}`);
+  noteAlertSet(a, `Alert set: ${symbol} crossing the ${alertTarget(a)}`);
 }
 
 /** Opens a symbol on the chart, switching the data source if needed. */
@@ -562,17 +582,53 @@ function placePriceAlertButton(y: number | null): void {
   priceAlertPrice = price;
   priceAlertButton.style.top = `${Math.round(y) - 11}px`;
   priceAlertButton.style.right = `${cc.priceScaleWidth() + 4}px`;
-  priceAlertButton.title = `Add alert at ${cc.formatPrice(price)}`;
+  priceAlertButton.setAttribute('aria-label', `Add alert at ${cc.formatPrice(price)}`);
   priceAlertButton.classList.remove('hidden');
 }
 
-priceAlertButton.addEventListener('mouseenter', () => (priceAlertHover = true));
-priceAlertButton.addEventListener('mouseleave', () => {
-  priceAlertHover = false;
-  hidePriceAlertButtonSoon();
-});
-priceAlertButton.addEventListener('click', () => {
-  if (priceAlertPrice !== null) addAlertAt(priceAlertPrice);
+// The mouse passes through the bell (pointer-events: none in CSS), so the chart keeps getting
+// every move: the bell and the crosshair glide with the mouse instead of the bell sitting still
+// under it and jumping once the mouse comes out. Hover and clicks are worked out here instead.
+function overPriceAlertButton(e: MouseEvent): boolean {
+  if (priceAlertButton.classList.contains('hidden')) return false;
+  const r = priceAlertButton.getBoundingClientRect();
+  return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top - 2 && e.clientY <= r.bottom + 2;
+}
+function setPriceAlertHover(on: boolean): void {
+  if (on === priceAlertHover) return;
+  priceAlertHover = on;
+  priceAlertButton.classList.toggle('hover', on);
+  chartWrap.classList.toggle('over-alert-button', on);
+  if (!on) hidePriceAlertButtonSoon();
+}
+let priceAlertPress = false;
+chartWrap.addEventListener('mousemove', (e) => setPriceAlertHover(overPriceAlertButton(e)), true);
+chartWrap.addEventListener('mouseleave', () => setPriceAlertHover(false));
+chartWrap.addEventListener(
+  'mousedown',
+  (e) => {
+    if (e.button !== 0 || !overPriceAlertButton(e)) return;
+    // Ours: the chart must not start a pan, a selection or a drawing, and the new alert line
+    // under the mouse must not start a drag (its handler sits on this same element).
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    priceAlertPress = true;
+    if (priceAlertPrice !== null) addAlertAt(priceAlertPrice);
+  },
+  true,
+);
+chartWrap.addEventListener(
+  'click',
+  (e) => {
+    if (!priceAlertPress) return;
+    priceAlertPress = false;
+    e.stopImmediatePropagation();
+  },
+  true,
+);
+// Keyboard: Tab to the bell and press Enter.
+priceAlertButton.addEventListener('click', (e) => {
+  if (e.detail === 0 && priceAlertPrice !== null) addAlertAt(priceAlertPrice);
 });
 
 // Hover an alert line for its price and a × to delete it; drag it to move the alert.
@@ -587,10 +643,15 @@ attachAlertInteraction({
   onHoverChange: (h) => {
     hoveringAlertLine = h;
     if (h) priceAlertButton.classList.add('hidden');
+    else placePriceAlertButton(crosshairY); // the crosshair may have moved before this ran
   },
 });
 
 alerts.onChange(() => {
+  if (alertNote) {
+    const a = alerts.all.find((x) => x.id === alertNote!.id);
+    if (!a || a.priceText !== alertNote.priceText) endAlertNote();
+  }
   alertsPrimitive.requestUpdate();
   alertsPanel.sync();
   syncStyleBar();
@@ -849,7 +910,8 @@ let crosshairActive = false;
 cc.chart.subscribeCrosshairMove((param) => {
   const bar = param.seriesData.get(cc.candles) as CandlestickData<Time> | undefined;
   crosshairActive = !!bar;
-  crosshairPrice = param.point ? cc.yToPrice(param.point.y) : null;
+  crosshairY = param.point ? param.point.y : null;
+  crosshairPrice = crosshairY === null ? null : cc.yToPrice(crosshairY);
   placePriceAlertButton(param.point ? param.point.y : null);
   showLegend(bar ? { time: bar.time as number, open: bar.open, high: bar.high, low: bar.low, close: bar.close } : cc.lastCandle);
 });
