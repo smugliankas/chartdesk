@@ -1,4 +1,5 @@
 import type { Candle, Timeframe } from '../types';
+import { reach } from './socket';
 import type { DataProvider, Quote, SymbolInfo } from './types';
 
 // Binance's public market-data-only endpoints. No API key or account needed.
@@ -179,7 +180,7 @@ export class BinanceProvider implements DataProvider {
 }
 
 async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await reach(url, 'Binance');
   if (!res.ok) {
     let detail = res.statusText;
     try {

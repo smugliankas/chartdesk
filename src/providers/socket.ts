@@ -47,9 +47,21 @@ export function liveSocket(
   };
 }
 
+/**
+ * fetch(), but when the request never gets an answer (offline, or a school or office network
+ * blocking the exchange) the error says which site could not be reached.
+ */
+export async function reach(url: string, source: string): Promise<Response> {
+  try {
+    return await fetch(url);
+  } catch {
+    throw new Error(`Can't reach ${source} (${new URL(url).host}). This network may be blocking it.`);
+  }
+}
+
 /** GET a JSON document; errors carry the source's name and its own message when it has one. */
 export async function getJson<T>(url: string, source: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await reach(url, source);
   if (!res.ok) {
     let detail = res.statusText || `HTTP ${res.status}`;
     try {

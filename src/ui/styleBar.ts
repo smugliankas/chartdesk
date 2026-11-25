@@ -1,4 +1,5 @@
 import type { DrawingManager } from '../drawings/DrawingManager';
+import { enhanceSelect } from './selectMenu';
 import {
   DEFAULT_FONT_SIZE,
   DEFAULT_LOSS_COLOR,
@@ -262,6 +263,7 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
   for (const size of FONT_SIZES) fontSelect.append(new Option(`${size}px`, String(size)));
   fontSelect.addEventListener('change', () => drawings.setStyle({ fontSize: Number(fontSelect.value) }));
   fontGroup.append(fontSelect);
+  enhanceSelect(fontSelect);
 
   // --- alert (horizontal and sloped lines) --------------------------------------
   const alertGroup = group();

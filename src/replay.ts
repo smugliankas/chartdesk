@@ -4,6 +4,7 @@ import { barCloseTime } from './chart/countdown';
 import type { Candle, Timeframe } from './types';
 import { IS_MAC } from './platform';
 import { makeDraggable } from './ui/draggable';
+import { enhanceSelect } from './ui/selectMenu';
 import { ICONS } from './ui/tools';
 
 /** Bars per second. */
@@ -88,6 +89,7 @@ export class Replay {
     exitButton.classList.add('rp-exit');
     const sep = () => Object.assign(document.createElement('span'), { className: 'rp-sep' });
     this.bar.append(selectButton, sep(), this.playButton, stepButton, this.speedSelect, sep(), this.dateLabel, sep(), exitButton);
+    enhanceSelect(this.speedSelect);
     host.wrap.append(this.bar);
     makeDraggable(this.bar, host.wrap, 'chartdesk:replayBarPos');
 

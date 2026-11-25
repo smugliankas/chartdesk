@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Drop-down menus (data source, replay speed, font sizes) are now the app's own, so they look
+  the same on Windows as on a Mac. The data source menu shows what each source covers.
+- When a data source can't be reached, the message says which site (for example, a school or
+  office network blocking Binance) instead of a general "Network error".
+- With "reduce motion" on (on Windows: Settings → Accessibility → Visual effects → Animation
+  effects off), menus fade in instead of sliding; colors and fades no longer switch abruptly.
 - Forex, gold, oil and stocks with no account: two new data sources, **Bybit TradFi**
   (EUR/USD, GBP/USD, USD/JPY, gold, silver, oil, US stocks and ETFs) and **Binance TradFi**
   (gold, silver, oil, US, Hong Kong and Korean stocks). Both are perpetual futures that follow

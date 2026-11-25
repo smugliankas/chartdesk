@@ -34,6 +34,7 @@ import { makeDraggable } from './ui/draggable';
 import { AUTO_SCALE_KEYS, FULLSCREEN_KEYS, setupFullscreen } from './ui/fullscreen';
 import { createRightPanel } from './ui/rightPanel';
 import { createWatchlist } from './ui/watchlist';
+import { enhanceSelect } from './ui/selectMenu';
 import { installTooltips } from './ui/tooltips';
 import { ALT, HOLD, ICONS, MOD, TOOL_GROUPS, TOOLS, toolDef, toolTitle } from './ui/tools';
 
@@ -182,10 +183,14 @@ applyAppearance(loadAppearance());
 // --- top bar ---------------------------------------------------------------------
 
 for (const p of PROVIDERS) {
-  const option = new Option(p.name, p.id);
+  // "Bybit TradFi (forex, gold, stocks)": the part in brackets goes on the menu's second line.
+  const [, main, detail] = /^(.*?)(?:\s*\((.*)\))?$/.exec(p.name)!;
+  const option = new Option(main, p.id);
+  if (detail) option.dataset.detail = detail;
   if (p.description) option.title = p.description;
   providerSelect.append(option);
 }
+enhanceSelect(providerSelect);
 
 const tfButtons = new Map<Timeframe, HTMLButtonElement>();
 for (const tf of TIMEFRAMES) {
@@ -933,7 +938,7 @@ window.addEventListener('keydown', (e) => {
 function escHasWork(): boolean {
   if (drawings.hasEscapable || replay.isSelecting) return true;
   const open = document.querySelector(
-    '.context-menu, dialog[open], #alertsPanel:not(.hidden), .symbol-list:not(.hidden), .palette:not(.hidden), .levels-menu:not(.hidden)',
+    '.context-menu, dialog[open], #alertsPanel:not(.hidden), .symbol-list:not(.hidden), .select-menu:not(.hidden), .palette:not(.hidden), .levels-menu:not(.hidden)',
   );
   if (open) return true;
   // A focused text box: Esc leaves the box first.

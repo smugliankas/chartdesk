@@ -1,3 +1,4 @@
+import { enhanceSelect } from './selectMenu';
 import { defaultAppearance, FONT_SIZES, withTheme, type Appearance, type Theme } from '../chart/appearance';
 
 /**
@@ -78,6 +79,7 @@ export function createSettingsDialog(
       </div>
     </form>`;
   document.body.append(dialog);
+  for (const select of dialog.querySelectorAll('select')) enhanceSelect(select);
 
   const inputs = [...dialog.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[data-field], select[data-field]')];
   const themeButtons = [...dialog.querySelectorAll<HTMLButtonElement>('[data-field="theme"] button')];
