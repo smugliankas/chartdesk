@@ -8,6 +8,10 @@
   --accent: #4f8cff;
   --up: #26a69a;
   --down: #ef5350;
+  --active-bg: linear-gradient(180deg, rgba(79, 140, 255, 0.3), rgba(79, 140, 255, 0.1));
+  --active-border: rgba(79, 140, 255, 0.5);
+  --active-text: #dbe7ff;
+  --active-glow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 2px 10px rgba(79, 140, 255, 0.14);
   color-scheme: dark;
 }
 
@@ -18,6 +22,10 @@ body.light {
   --hover: #eceff4;
   --text: #131722;
   --muted: #6a6f7d;
+  --active-bg: linear-gradient(180deg, rgba(79, 140, 255, 0.2), rgba(79, 140, 255, 0.07));
+  --active-border: rgba(41, 98, 255, 0.45);
+  --active-text: #1d4ed8;
+  --active-glow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 8px rgba(41, 98, 255, 0.1);
   color-scheme: light;
 }
 
@@ -82,10 +90,13 @@ button:disabled {
   cursor: default;
 }
 
-button.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+/* Selected state: a soft blue gradient instead of a solid fill. */
+button.active,
+button.active:hover:not(:disabled) {
+  background: var(--active-bg);
+  border-color: var(--active-border);
+  color: var(--active-text);
+  box-shadow: var(--active-glow);
 }
 
 button.icon {
@@ -225,9 +236,13 @@ button.icon svg {
   background: var(--hover);
 }
 
-#sidebar .tool.active {
-  background: var(--accent);
-  color: #fff;
+#sidebar .tool.active,
+#sidebar .tool.active:hover:not(:disabled) {
+  background: var(--active-bg);
+  color: var(--active-text);
+  box-shadow:
+    inset 0 0 0 1px var(--active-border),
+    var(--active-glow);
 }
 
 #sidebar .tool.danger:hover:not(:disabled) {
@@ -294,8 +309,10 @@ button.icon svg {
   padding: 0;
 }
 
-#chartControls button.active {
-  background: var(--accent);
+#chartControls button.active,
+#chartControls button.active:hover:not(:disabled) {
+  background: var(--active-bg);
+  opacity: 1;
 }
 
 /* Floating style bar for the selected drawing. */
@@ -531,9 +548,11 @@ kbd {
   min-width: 70px;
 }
 
-.segmented button.active {
-  background: var(--accent);
-  color: #fff;
+.segmented button.active,
+.segmented button.active:hover:not(:disabled) {
+  background: var(--active-bg);
+  color: var(--active-text);
+  box-shadow: inset 0 0 0 1px var(--active-border);
 }
 
 .settings-row select {
@@ -1049,4 +1068,38 @@ body.light #tooltip {
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
   }
+}
+
+/* Timeframes: one group with a thin dark outline. */
+#timeframes {
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #000;
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+body.light #timeframes {
+  border-color: var(--border);
+}
+
+#timeframes button {
+  height: 24px;
+  padding: 0 9px;
+  border-color: transparent;
+  background: transparent;
+  border-radius: 6px;
+}
+
+#timeframes button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--hover);
+}
+
+#timeframes button.active,
+#timeframes button.active:hover:not(:disabled) {
+  background: var(--active-bg);
+  border-color: var(--active-border);
+  color: var(--active-text);
+  box-shadow: var(--active-glow);
 }

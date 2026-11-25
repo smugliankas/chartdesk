@@ -11,7 +11,7 @@
   to delete it; drag the line to move the alert. Alerts use the chart's text color.
 
 - Polish: menus, lists, the style bar and dialogs open with short animations; buttons react
-  to hover and clicks; fast tooltips that show keyboard shortcuts as keys; a thin loading bar
+  to hover and clicks; selected buttons use a soft blue gradient; timeframes sit in one outlined group; fast tooltips that show keyboard shortcuts as keys; a thin loading bar
   and a dimmed chart while data loads; matches highlighted in symbol search; Esc closes menus.
   Animations are turned off when the system asks for reduced motion.
 
