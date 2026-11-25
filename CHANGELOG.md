@@ -10,6 +10,9 @@
   alerts can be turned on again or cleared. Hover an alert line to see its price and a ×
   to delete it; drag the line to move the alert. Alerts use the chart's text color.
 
+- Hold ⌘ (Mac) or Ctrl (Windows/Linux) for a temporary magnet, like TradingView: while held,
+  the crosshair and drawing points snap to the nearest open, high, low or close. If the magnet
+  is already on, holding the key turns it off. The crosshair now also snaps while the magnet is on.
 - Polish: menus, lists, the style bar and dialogs open with short animations; buttons react
   to hover and clicks; selected buttons use a soft blue gradient; timeframes sit in one outlined group; fast tooltips that show keyboard shortcuts as keys; a thin loading bar
   and a dimmed chart while data loads; matches highlighted in symbol search; Esc closes menus.

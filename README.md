@@ -34,6 +34,7 @@ your machine.
 | --- | --- |
 | `Alt/⌥` + `T` `H` `V` `R` `F` `L` `S` `N` `M` | Trend line, horizontal line, vertical line, rectangle, Fibonacci, long, short, text, measure |
 | `Alt/⌥` + `A` | Alert at the cursor price |
+| Hold `⌘` (Mac) / `Ctrl` | Magnet while held: crosshair and drawing points snap to open/high/low/close |
 | `Shift` + click | Measure |
 | `Esc` | Cursor / cancel |
 | `Del` / `Backspace` | Delete selected drawing |

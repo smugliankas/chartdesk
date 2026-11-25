@@ -202,6 +202,11 @@ export class ChartController {
     return this.candles.priceScale().options().autoScale;
   }
 
+  /** With the magnet on, the crosshair snaps to the nearest open, high, low or close. */
+  setCrosshairMagnet(on: boolean): void {
+    this.chart.applyOptions({ crosshair: { mode: on ? CrosshairMode.MagnetOHLC : CrosshairMode.Normal } });
+  }
+
   /** Turning auto-scale off keeps the current price range where it is. */
   setAutoScale(on: boolean): void {
     this.candles.priceScale().setAutoScale(on);

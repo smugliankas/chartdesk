@@ -1,3 +1,4 @@
+import { IS_MAC } from '../platform';
 import type { ToolId } from '../drawings/model';
 
 const svg = (body: string) =>
@@ -55,9 +56,10 @@ export const TOOLBAR: readonly (ToolDef | null)[] = [
   { id: 'measure', title: 'Measure', key: 'KeyM', keyLabel: 'Shift + click' },
 ];
 
-const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
-export const ALT = isMac ? '⌥' : 'Alt+';
-export const MOD = isMac ? '⌘' : 'Ctrl+';
+export const ALT = IS_MAC ? '⌥' : 'Alt+';
+export const MOD = IS_MAC ? '⌘' : 'Ctrl+';
+/** The key to hold for a temporary magnet. */
+export const HOLD = IS_MAC ? '⌘' : 'Ctrl';
 
 export function toolTitle(t: ToolDef): string {
   const keys: string[] = [];

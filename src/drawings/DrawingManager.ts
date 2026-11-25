@@ -1,5 +1,6 @@
 import { readable } from '../chart/appearance';
 import type { ChartController } from '../chart/ChartController';
+import { modifierHeld } from '../platform';
 import { DrawingsPrimitive, type DrawingSource } from './DrawingsPrimitive';
 import { distToSegment, extendSegment, handlesOf, moveHandle, moveWhole, type Part } from './geometry';
 import {
@@ -57,6 +58,8 @@ export class DrawingManager implements DrawingSource {
   private measuring = false;
   private drag: DragState | null = null;
   private magnet = false;
+  /** ⌘ (Mac) / Ctrl held: flips the magnet while held, like TradingView. */
+  private magnetHeld = false;
   private storageKey = '';
   private undoStack: Drawing[][] = [];
   private redoStack: Drawing[][] = [];
@@ -82,6 +85,9 @@ export class DrawingManager implements DrawingSource {
     container.addEventListener('mousemove', this.onHover);
     container.addEventListener('dblclick', this.onDoubleClick, true);
     window.addEventListener('keydown', this.onKeyDown);
+    window.addEventListener('keydown', this.onModifierKey);
+    window.addEventListener('keyup', this.onModifierKey);
+    window.addEventListener('blur', () => this.setMagnetHeld(false));
   }
 
   // --- public API ---------------------------------------------------------------
@@ -98,6 +104,22 @@ export class DrawingManager implements DrawingSource {
   get magnetOn(): boolean {
     return this.magnet;
   }
+
+  /** The magnet as it acts right now: the setting, flipped while ⌘/Ctrl is held. */
+  private get magnetActive(): boolean {
+    return this.magnet !== this.magnetHeld;
+  }
+
+  private setMagnetHeld(held: boolean): void {
+    if (held === this.magnetHeld) return;
+    this.magnetHeld = held;
+    this.cc.setCrosshairMagnet(this.magnetActive);
+    if (this.pending || this.measuring || this.drag) this.redraw();
+  }
+
+  private onModifierKey = (e: KeyboardEvent): void => {
+    this.setMagnetHeld(modifierHeld(e));
+  };
 
   get canUndo(): boolean {
     return this.undoStack.length > 0;
@@ -170,6 +192,7 @@ export class DrawingManager implements DrawingSource {
 
   setMagnet(on: boolean): void {
     this.magnet = on;
+    this.cc.setCrosshairMagnet(this.magnetActive);
     this.changed();
   }
 
@@ -286,7 +309,7 @@ export class DrawingManager implements DrawingSource {
     if (logicalRaw === null || price === null) return null;
     const logical = Math.round(logicalRaw);
 
-    if (useMagnet && this.magnet) {
+    if (useMagnet && this.magnetActive) {
       const c = this.cc.candleAt(logical);
       if (c) {
         const p = price;
@@ -476,6 +499,7 @@ export class DrawingManager implements DrawingSource {
   // --- mouse ---------------------------------------------------------------------
 
   private onMouseDown = (e: MouseEvent): void => {
+    this.setMagnetHeld(modifierHeld(e));
     if (e.button !== 0) return;
     const { x, y, inPane } = this.local(e);
     if (!inPane) return;
@@ -562,6 +586,7 @@ export class DrawingManager implements DrawingSource {
   };
 
   private onHover = (e: MouseEvent): void => {
+    this.setMagnetHeld(modifierHeld(e));
     if (this.drag) return;
     const { x, y } = this.local(e);
 
@@ -602,6 +627,7 @@ export class DrawingManager implements DrawingSource {
   };
 
   private onDragMove = (e: MouseEvent): void => {
+    this.setMagnetHeld(modifierHeld(e));
     const drag = this.drag;
     if (!drag) return;
     const { x, y } = this.local(e);

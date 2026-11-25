@@ -23,7 +23,7 @@ import { createSettingsDialog } from './ui/settingsDialog';
 import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
 import { installTooltips } from './ui/tooltips';
-import { ALT, ICONS, MOD, TOOLBAR, toolTitle } from './ui/tools';
+import { ALT, HOLD, ICONS, MOD, TOOLBAR, toolTitle } from './ui/tools';
 
 // --- elements ----------------------------------------------------------------
 
@@ -240,7 +240,7 @@ for (const t of TOOLBAR) {
   toolButtons.set(t.id, b);
 }
 separator();
-const magnetButton = sidebarButton(ICONS.magnet, 'Magnet: snap to open/high/low/close', () => {
+const magnetButton = sidebarButton(ICONS.magnet, `Magnet: snap to open/high/low/close (hold ${HOLD})`, () => {
   drawings.setMagnet(!drawings.magnetOn);
   settings.magnet = drawings.magnetOn;
   saveSettings();
@@ -611,6 +611,7 @@ const shortcuts: [string, string][] = [
   ...TOOLBAR.filter((t) => t?.key).map((t) => [`${ALT}${t!.key!.replace('Key', '')}`, t!.title] as [string, string]),
   ['Shift + click', 'Measure'],
   [`${ALT}A`, 'Alert at the cursor price'],
+  [`Hold ${HOLD}`, 'Magnet while held (snap to open/high/low/close)'],
   ['Esc', 'Cursor / cancel'],
   ['Del', 'Delete selected drawing'],
   [`${MOD}Z`, 'Undo'],
