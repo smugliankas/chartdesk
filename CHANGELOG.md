@@ -14,7 +14,8 @@
   clicks: two for the base line, one for the width), price range, date range (bars, time and
   volume) and brush. Horizontal rays, cross lines and arrows can carry alerts.
 - The left toolbar groups tools like TradingView: each button shows the tool used last from its
-  group, and the small corner arrow opens the others.
+  group. The thin strip next to the button opens the others (so do a right-click and a long
+  press on the button).
 - Drawings list: the layers button in the top bar lists every drawing on the symbol. Click one
   to select it; hide, lock or delete it from its row. Hidden drawings stay saved.
 - The watchlist and the drawings list share the right panel; it remembers which one was open

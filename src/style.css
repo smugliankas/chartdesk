@@ -221,7 +221,7 @@ button.icon svg {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  width: 46px;
+  width: 54px;
   padding: 6px 0;
   background: var(--panel);
   border-right: 1px solid var(--border);
@@ -258,7 +258,7 @@ button.icon svg {
 #sidebar .sep {
   width: 26px;
   height: 1px;
-  margin: 4px 0;
+  margin: 4px 11px 4px 0; /* centered under the buttons, which leave room for the group strip */
   background: var(--border);
 }
 
@@ -1457,190 +1457,63 @@ body.light #timeframes {
 
 /* --- Tool groups in the left toolbar ------------------------------------------------ */
 
+/*
+ * Each group is its button plus a thin strip on its right, as tall as the button, that opens
+ * the group's other tools. Single tools and the buttons below get the same space on the right,
+ * so every button lines up.
+ */
 .tool-group {
-  position: relative;
   display: flex;
+  gap: 1px;
 }
 
-/*
- * Small corner arrow that opens the group's other tools, like TradingView. It sits inside the
- * button's bottom-right corner and never gets a background of its own, so it moves and lights
- * up together with the button.
- */
+.tool-group.single,
+#sidebar > .tool {
+  margin-right: 11px;
+}
+
 .tool-more,
 .tool-more:hover:not(:disabled),
 .tool-more:active:not(:disabled) {
-  position: absolute;
-  right: 1px;
-  bottom: 1px;
-  width: 13px;
-  height: 13px;
-  padding: 0 2px 2px 0;
+  width: 10px;
+  height: 34px;
+  padding: 0;
   border: none;
-  border-radius: 0 0 6px 0;
-  background: transparent;
+  border-radius: 4px;
   box-shadow: none;
   transform: none;
   display: flex;
-  align-items: flex-end;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-more {
+  background: transparent;
   color: var(--muted);
-  opacity: 0.6;
+  opacity: 0.45;
 }
 
 .tool-more svg {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 9px;
   transition: transform var(--t-fast) var(--ease-out);
 }
 
-.tool-group:hover .tool-more,
-.tool-more.open {
+/* The strip shows when the group is hovered, and lights up when the strip itself is. */
+.tool-group:hover .tool-more {
   opacity: 1;
+  background: var(--hover);
 }
 
 .tool-more:hover:not(:disabled),
 .tool-more.open {
-  color: var(--text);
-}
-
-.tool-more:hover:not(:disabled) svg,
-.tool-more.open svg {
-  transform: scale(1.35);
-  transform-origin: bottom right;
-}
-
-/* On the selected (blue) button the arrow takes the button's text color. */
-.tool-group:has(.tool.active) .tool-more {
-  color: var(--active-text);
-  opacity: 0.8;
-}
-
-/* Pressing the button presses the arrow with it. */
-.tool-group:has(.tool:active) .tool-more {
-  transform: translate(-1px, -1px);
-}
-
-/* --- drawings list (object tree) ------------------------------------------------------ */
-
-.dl-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.dl-header h3 {
-  margin-bottom: 0;
-}
-
-.dl-count {
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dl-rows {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-  padding: 4px 0;
-}
-
-.dl-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 34px;
-  padding: 0 6px 0 10px;
-  border-left: 2px solid transparent;
-  cursor: pointer;
-  transition: background-color 0.12s ease;
-}
-
-.dl-row:hover {
-  background: var(--hover);
-}
-
-.dl-row.current {
-  background: var(--active-bg), var(--panel);
-  border-left-color: var(--accent);
-}
-
-.dl-row.is-hidden .dl-icon,
-.dl-row.is-hidden .dl-name {
-  opacity: 0.45;
-}
-
-.dl-icon {
-  display: flex;
-  flex-shrink: 0;
-  color: var(--text);
-}
-
-.dl-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.dl-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dl-detail {
-  margin-left: 8px;
-  color: var(--muted);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.dl-actions {
-  display: flex;
-  gap: 2px;
-  flex-shrink: 0;
-}
-
-.dl-action {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-}
-
-.dl-action svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* Hide/lock stay visible while they are on, so a hidden or locked drawing is easy to spot. */
-.dl-row:hover .dl-action,
-.dl-action.on {
   opacity: 1;
-}
-
-.dl-action.on {
+  background: var(--border);
   color: var(--text);
 }
 
-.dl-action:hover:not(:disabled) {
-  background: var(--panel);
-  color: var(--text);
-}
-
-.dl-action.danger:hover:not(:disabled) {
-  color: var(--loss);
+.tool-more.open svg {
+  transform: translateX(1px);
 }
 
 /* While its menu is open, the group's button stays lit like on hover. */

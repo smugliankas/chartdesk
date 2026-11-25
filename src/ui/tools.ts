@@ -17,7 +17,7 @@ export const ICONS = {
   pricerange: svg('<path d="M4 4h16M4 20h16M12 7v10M9 9.5L12 6.5l3 3M9 14.5l3 3 3-3"/>'),
   daterange: svg('<path d="M4 4v16M20 4v16M7 12h10M9.5 9L6.5 12l3 3M14.5 9l3 3-3 3"/>'),
   brush: svg('<path d="M3 17c3-6 5-6 7-2s4 4 6-2 3-5 5-4"/>'),
-  more: '<svg viewBox="0 0 8 8"><path d="M8 0v8H0z" fill="currentColor"/></svg>',
+  more: '<svg viewBox="0 0 6 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5L4.5 5l-3 3.5"/></svg>',
   vline: svg('<path d="M12 3v18"/><circle cx="12" cy="12" r="1.6"/>'),
   rect: svg('<rect x="4" y="6" width="16" height="12" rx="1"/>'),
   fib: svg('<path d="M3 5h18M3 9.5h18M3 13h18M3 19h18"/><path d="M5 19L19 5" stroke-dasharray="2 2"/>'),

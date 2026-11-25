@@ -287,18 +287,26 @@ for (const [i, tools] of TOOL_GROUPS.entries()) {
     more: null,
   };
   const wrap = document.createElement('div');
-  wrap.className = 'tool-group';
+  wrap.className = 'tool-group' + (tools.length > 1 ? '' : ' single');
   g.button.className = 'tool';
-  g.button.addEventListener('click', () => drawings.setTool(drawings.currentTool === g.current && g.current !== 'cursor' ? 'cursor' : g.current));
+  let suppressClick = false;
+  g.button.addEventListener('click', () => {
+    if (suppressClick) {
+      suppressClick = false;
+      return;
+    }
+    drawings.setTool(drawings.currentTool === g.current && g.current !== 'cursor' ? 'cursor' : g.current);
+  });
   wrap.append(g.button);
+
   if (tools.length > 1) {
+    // A strip beside the button opens the group's other tools; so do a right-click and a long press.
     const more = document.createElement('button');
     more.className = 'tool-more';
     more.innerHTML = ICONS.more;
-    more.setAttribute('aria-label', 'More tools');
-    more.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const r = wrap.getBoundingClientRect();
+    more.dataset.tip = 'More tools';
+    const openMenu = () => {
+      const r = more.getBoundingClientRect();
       more.classList.add('open');
       showContextMenu(
         r.right + 6,
@@ -310,7 +318,27 @@ for (const [i, tools] of TOOL_GROUPS.entries()) {
         }),
         () => more.classList.remove('open'),
       );
+    };
+    // A second click on the strip closes the menu instead of opening it again.
+    let wasOpen = false;
+    more.addEventListener('mousedown', () => (wasOpen = more.classList.contains('open')));
+    more.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!wasOpen) openMenu();
     });
+    wrap.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      openMenu();
+    });
+    let pressTimer: ReturnType<typeof setTimeout> | undefined;
+    g.button.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      pressTimer = setTimeout(() => {
+        suppressClick = true;
+        openMenu();
+      }, 450);
+    });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel'] as const) g.button.addEventListener(ev, () => clearTimeout(pressTimer));
     wrap.append(more);
     g.more = more;
   }
