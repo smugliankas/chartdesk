@@ -16,7 +16,8 @@ your machine.
 - Candlestick chart with volume; timeframes 1m, 5m, 15m, 30m, 1H, 4H, 1D, 1W and 1M
 - Older history loads automatically as you scroll left
 - Crypto, forex, gold, oil and stocks with no account: Binance, plus Bybit and Binance
-  perpetual futures on traditional markets; symbol search with plain names, live updates
+  perpetual futures on traditional markets; one symbol search across all sources (picking
+  a result switches the source), plain names, live updates
 - Watchlist with live prices and 24h change, mixing symbols from several sources; click a
   symbol to open it
 - Price alerts with sound, desktop notification and on-screen message; set from the bell menu,

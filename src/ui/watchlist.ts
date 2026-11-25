@@ -1,4 +1,4 @@
-import { getProvider, type DataProvider, type Quote } from '../providers';
+import { getProvider, type DataProvider, type Quote, type SymbolInfo } from '../providers';
 import { attachSymbolSearch } from './symbolSearch';
 
 export interface WatchItem {
@@ -13,8 +13,10 @@ interface Saved {
 interface Options {
   /** Data source of the default list (for a first visit). */
   providerId: string;
-  /** Data source new entries come from: the chart's, when it can list prices. */
+  /** Data source for a typed symbol that isn't in the search results: the chart's, when it can list prices. */
   addProvider: () => DataProvider;
+  /** Symbol search for the add box (across sources; each result names its source). */
+  search: (query: string, partial: (items: SymbolInfo[]) => void) => Promise<SymbolInfo[]> | null;
   /** The symbol on the chart, to highlight its row. */
   current: () => WatchItem;
   /** Switches the chart to a symbol. */
@@ -49,7 +51,7 @@ function formatQuotePrice(p: number, decimals?: number): string {
 }
 
 /** Watchlist view for the right panel: live prices of a list of symbols. Click a row to open it on the chart. */
-export function createWatchlist({ providerId, addProvider, current, onSelect }: Options): {
+export function createWatchlist({ providerId, addProvider, search, current, onSelect }: Options): {
   element: HTMLElement;
   show: () => void;
   hide: () => void;
@@ -84,17 +86,12 @@ export function createWatchlist({ providerId, addProvider, current, onSelect }: 
   const rowsEl = panel.querySelector<HTMLDivElement>('.wl-rows')!;
   const addInput = panel.querySelector<HTMLInputElement>('.wl-add input')!;
 
-  // New symbols come from the chart's data source (so a Bybit chart adds Bybit symbols).
-  const syncPlaceholder = () => {
-    addInput.placeholder = `Add symbol (${addProvider().name.replace(/\s*\(.*\)$/, '')})…`;
-  };
-  addInput.addEventListener('focus', syncPlaceholder);
   attachSymbolSearch(addInput, {
-    search: (q) => addProvider().searchSymbols?.(q) ?? null,
-    onPick: (symbol) => {
+    search,
+    onPick: (symbol, item) => {
       addInput.value = '';
       const s = symbol.toUpperCase();
-      const pid = addProvider().id;
+      const pid = item?.providerId ?? addProvider().id;
       if (!state.items.some((i) => i.providerId === pid && i.symbol === s)) {
         state.items.push({ providerId: pid, symbol: s });
         save();
@@ -203,9 +200,8 @@ export function createWatchlist({ providerId, addProvider, current, onSelect }: 
       visible = false;
       restartQuotes();
     },
-    /** Re-highlights the current symbol and names the source new symbols come from. */
+    /** Re-highlights the current symbol. */
     sync: () => {
-      syncPlaceholder();
       const cur = current();
       for (const item of state.items) {
         rowEls.get(keyOf(item.providerId, item.symbol))?.row.classList.toggle('current', item.providerId === cur.providerId && item.symbol === cur.symbol);

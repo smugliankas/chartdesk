@@ -28,6 +28,7 @@ import { showContextMenu, type MenuEntry } from './ui/contextMenu';
 import { createSettingsDialog } from './ui/settingsDialog';
 import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
+import { searchAll } from './providers/search';
 import { canvasToBlob, copyImage, renderSnapshot, snapshotFileName } from './ui/snapshot';
 import { createDrawingsList } from './ui/drawingsList';
 import { makeDraggable } from './ui/draggable';
@@ -229,15 +230,13 @@ providerSelect.addEventListener('change', () => {
   }
 });
 
+// The symbol box searches every source; picking a result from another source switches to it.
 attachSymbolSearch(symbolInput, {
-  search: (q) => provider.searchSymbols?.(q) ?? null,
-  onPick: (s) => {
-    symbol = s.toUpperCase();
-    settings.symbols[provider.id] = symbol;
-    saveSettings();
-    void load();
-  },
+  search: (q, partial) => (provider.searchSymbols ? searchAll(q, provider.id, partial) : null),
+  onPick: (s, item) => selectSymbol(item?.providerId ?? provider.id, s.toUpperCase()),
 });
+// Leaving the box without picking puts the chart's symbol back.
+symbolInput.addEventListener('blur', () => setTimeout(() => (symbolInput.value = symbol), 0));
 
 csvFile.addEventListener('change', async () => {
   const file = csvFile.files?.[0];
@@ -982,6 +981,7 @@ drawingsListButton.innerHTML = ICONS.layers;
 const watchlist = createWatchlist({
   providerId: 'binance',
   addProvider: () => (provider.searchSymbols && provider.watchQuotes ? provider : getProvider('binance')),
+  search: (q, partial) => searchAll(q, provider.id, partial),
   current: () => ({ providerId: provider.id, symbol }),
   onSelect: (item) => selectSymbol(item.providerId, item.symbol),
 });

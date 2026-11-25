@@ -17,6 +17,9 @@ export interface SymbolInfo {
   name?: string;
   /** Short extra text shown next to the symbol (e.g. 24h change). */
   detail?: string;
+  /** In a search across sources: the source the symbol comes from, and its label. */
+  providerId?: string;
+  source?: string;
 }
 
 /**

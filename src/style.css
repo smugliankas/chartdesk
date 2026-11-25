@@ -174,7 +174,7 @@ button.icon svg {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
-  width: 320px;
+  width: 420px;
   max-height: 340px;
   overflow-y: auto;
   padding: 4px;
@@ -217,7 +217,22 @@ button.icon svg {
 }
 
 .symbol-item .detail {
+  flex: none;
   color: var(--muted);
+}
+
+.symbol-name {
+  flex: 1;
+}
+
+/* Which source a result comes from, in a search across sources. */
+.symbol-source {
+  flex: none;
+  width: 92px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .symbol-item .detail.up {
@@ -1391,7 +1406,10 @@ body.light #timeframes {
 }
 
 .wl-add .symbol-list {
-  width: 100%;
+  /* Wider than the panel, growing to the left over the chart, so the source fits. */
+  left: auto;
+  right: 0;
+  width: max(100%, 400px);
   z-index: 20;
 }
 

@@ -1,10 +1,13 @@
 import type { SymbolInfo } from '../providers';
 
 interface Options {
-  /** Returns matches for the query, or null if the current provider has no search. */
-  search: (query: string) => Promise<SymbolInfo[]> | null;
-  /** Called with the chosen symbol (from the list, or typed and confirmed with Enter). */
-  onPick: (symbol: string) => void;
+  /**
+   * Returns matches for the query, or null if there is no search. A search across several
+   * sources can hand over what it has so far through `partial`.
+   */
+  search: (query: string, partial: (items: SymbolInfo[]) => void) => Promise<SymbolInfo[]> | null;
+  /** Called with the chosen symbol (from the list, or typed and confirmed with Enter) and its entry, if any. */
+  onPick: (symbol: string, item?: SymbolInfo) => void;
 }
 
 /** Turns a text input into a symbol box with a searchable dropdown. */
@@ -43,10 +46,16 @@ export function attachSymbolSearch(input: HTMLInputElement, { search, onPick }: 
           detail.textContent = it.detail;
           row.append(detail);
         }
+        if (it.source) {
+          const source = document.createElement('span');
+          source.className = 'symbol-source';
+          source.textContent = it.source;
+          row.append(source);
+        }
         // mousedown (not click) so the input keeps focus until we're done.
         row.addEventListener('mousedown', (e) => {
           e.preventDefault();
-          pick(it.symbol);
+          pick(it.symbol, it);
         });
         return row;
       }),
@@ -64,9 +73,18 @@ export function attachSymbolSearch(input: HTMLInputElement, { search, onPick }: 
   };
 
   const update = () => {
-    const pending = search(input.value);
+    const mine = seq + 1;
+    // Results so far, from the sources that have answered (the list fills in as the rest do).
+    const partial = (res: SymbolInfo[]) => {
+      if (mine !== seq || document.activeElement !== input || res.length === 0) return;
+      const keep = items[active];
+      items = res;
+      active = keep ? res.findIndex((i) => i.symbol === keep.symbol && i.providerId === keep.providerId) : -1;
+      render();
+    };
+    const pending = search(input.value, partial);
     if (!pending) return close();
-    const mine = ++seq;
+    seq = mine;
     pending
       .then((res) => {
         if (mine !== seq || document.activeElement !== input) return;
@@ -80,11 +98,11 @@ export function attachSymbolSearch(input: HTMLInputElement, { search, onPick }: 
       });
   };
 
-  const pick = (symbol: string) => {
+  const pick = (symbol: string, item?: SymbolInfo) => {
     input.value = symbol;
     close();
     input.blur();
-    onPick(symbol);
+    onPick(symbol, item);
   };
 
   input.addEventListener('focus', () => {
@@ -104,8 +122,13 @@ export function attachSymbolSearch(input: HTMLInputElement, { search, onPick }: 
       render();
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const chosen = active >= 0 ? items[active]?.symbol : input.value.trim().toUpperCase();
-      if (chosen) pick(chosen);
+      if (active >= 0 && items[active]) {
+        pick(items[active].symbol, items[active]);
+      } else {
+        // Typed and confirmed: the first entry with exactly that symbol, if the list has one.
+        const typed = input.value.trim().toUpperCase();
+        if (typed) pick(typed, items.find((i) => i.symbol === typed));
+      }
     } else if (e.key === 'Escape') {
       close();
       input.blur();

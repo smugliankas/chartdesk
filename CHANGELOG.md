@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- One symbol search for every source: type "xau", "eur" or "btc" and the list shows matches
+  from Binance, Bybit TradFi and Binance TradFi together, each with its source on the right.
+  Picking one switches the chart to that source on its own; no need to change the data source
+  first. The watchlist's add box searches the same way.
 - Drop-down menus (data source, replay speed, font sizes) are now the app's own, so they look
   the same on Windows as on a Mac. The data source menu shows what each source covers.
 - When a data source can't be reached, the message says which site (for example, a school or
