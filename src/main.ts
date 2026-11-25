@@ -27,6 +27,7 @@ import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
 import { canvasToBlob, copyImage, renderSnapshot, snapshotFileName } from './ui/snapshot';
 import { createDrawingsList } from './ui/drawingsList';
+import { AUTO_SCALE_KEYS, FULLSCREEN_KEYS, setupFullscreen } from './ui/fullscreen';
 import { createRightPanel } from './ui/rightPanel';
 import { createWatchlist } from './ui/watchlist';
 import { installTooltips } from './ui/tooltips';
@@ -658,10 +659,12 @@ volumeButton.addEventListener('click', () => {
   applyAppearance({ ...cc.appearance, showVolume: !cc.appearance.showVolume });
   settingsDialog.sync();
 });
-autoButton.addEventListener('click', () => {
+function toggleAutoScale(): void {
   cc.setAutoScale(!cc.isAutoScale());
   syncControls();
-});
+}
+autoButton.addEventListener('click', toggleAutoScale);
+autoButton.title = `Auto-fit the price scale (${AUTO_SCALE_KEYS})`;
 
 function syncControls(): void {
   controlsEl.style.right = `${cc.priceScaleWidth() + 8}px`;
@@ -852,6 +855,40 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+// --- full screen and view shortcuts -------------------------------------------------------
+
+/** Whether Esc has something to cancel before it may leave full screen. */
+function escHasWork(): boolean {
+  if (drawings.hasEscapable) return true;
+  const open = document.querySelector(
+    '.context-menu, dialog[open], #alertsPanel:not(.hidden), .symbol-list:not(.hidden), .palette:not(.hidden), .levels-menu:not(.hidden)',
+  );
+  if (open) return true;
+  // A focused text box: Esc leaves the box first.
+  const active = document.activeElement as HTMLElement | null;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+    active.blur();
+    return true;
+  }
+  return false;
+}
+
+const fullscreen = setupFullscreen($<HTMLButtonElement>('fullscreen'), escHasWork);
+
+// Shift + letter toggles a view setting, like TradingView: Shift+F full screen, Shift+A auto-scale.
+window.addEventListener('keydown', (e) => {
+  const target = e.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+  if (!e.shiftKey || e.altKey || e.metaKey || e.ctrlKey || e.repeat) return;
+  if (e.code === 'KeyF') {
+    e.preventDefault();
+    fullscreen.toggle();
+  } else if (e.code === 'KeyA') {
+    e.preventDefault();
+    toggleAutoScale();
+  }
+});
+
 // --- About dialog ------------------------------------------------------------------
 
 const aboutDialog = $<HTMLDialogElement>('aboutDialog');
@@ -898,7 +935,9 @@ const shortcuts: [string, string][] = [
   ['Right-click', 'Drawing and chart menu'],
   [SNAPSHOT_DOWNLOAD_KEYS, 'Download chart image'],
   [SNAPSHOT_COPY_KEYS, 'Copy chart image'],
-  ['Esc', 'Cursor / cancel'],
+  ['Esc', 'Cursor / cancel; in full screen, exits when there is nothing to cancel'],
+  [FULLSCREEN_KEYS, 'Full screen'],
+  [AUTO_SCALE_KEYS, 'Auto-fit the price scale on / off'],
   ['Del', 'Delete selected drawing'],
   [`${MOD}Z`, 'Undo'],
   [`${MOD}⇧Z`, 'Redo'],

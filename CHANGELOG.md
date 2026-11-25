@@ -10,6 +10,11 @@
   it to paste anywhere (⇧⌘S / Ctrl+Shift+S). The image has a header with the symbol,
   timeframe and last bar, and leaves out the selection handles.
 - Icon for the browser tab, and a description for link previews.
+- Full screen: button in the top bar or ⇧F (Shift+F). Esc first cancels what is going on (a
+  tool, a selection, a menu) and leaves full screen only when there is nothing left to cancel
+  (Chrome and Edge; holding Esc always exits. In Safari and Firefox the browser keeps Esc for
+  leaving full screen).
+- ⇧A (Shift+A) turns auto-fit of the price scale on and off.
 - New drawing tools: horizontal ray (⌥J), cross line (⌥C), arrow, parallel channel (three
   clicks: two for the base line, one for the width), price range, date range (bars, time and
   volume) and brush. Horizontal rays, cross lines and arrows can carry alerts.

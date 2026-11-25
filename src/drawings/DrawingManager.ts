@@ -256,6 +256,19 @@ export class DrawingManager implements DrawingSource {
     this.changed();
   }
 
+  /** Whether Esc has something to cancel here: a tool in use, a selection, a ruler, text being edited. */
+  get hasEscapable(): boolean {
+    return (
+      this.tool !== 'cursor' ||
+      this.selectedId !== null ||
+      this.measure !== null ||
+      this.pending !== null ||
+      this.channelBase !== null ||
+      this.stroke !== null ||
+      this.textEditor !== null
+    );
+  }
+
   get canPaste(): boolean {
     return this.clipboard !== null;
   }

@@ -54,7 +54,9 @@ your machine.
 | Right-click | Drawing or chart menu |
 | `⌥⌘S` / `Ctrl` + `Alt` + `S` | Download chart image |
 | `⇧⌘S` / `Ctrl` + `Shift` + `S` | Copy chart image |
-| `Esc` | Cursor / cancel |
+| `Esc` | Cursor / cancel (in full screen: exits when there is nothing to cancel) |
+| `⇧F` / `Shift` + `F` | Full screen |
+| `⇧A` / `Shift` + `A` | Auto-fit the price scale on / off |
 | `Del` / `Backspace` | Delete selected drawing |
 | `⌘/Ctrl` + `Z`, `⌘/Ctrl` + `Shift` + `Z` | Undo, redo |
 | Double-click a text note | Edit it |
