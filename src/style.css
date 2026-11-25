@@ -1462,28 +1462,36 @@ body.light #timeframes {
   display: flex;
 }
 
-/* Small corner arrow that opens the group's other tools, like TradingView. */
-.tool-more {
+/*
+ * Small corner arrow that opens the group's other tools, like TradingView. It sits inside the
+ * button's bottom-right corner and never gets a background of its own, so it moves and lights
+ * up together with the button.
+ */
+.tool-more,
+.tool-more:hover:not(:disabled),
+.tool-more:active:not(:disabled) {
   position: absolute;
-  right: -3px;
-  top: 0;
-  bottom: 0;
-  width: 11px;
-  padding: 0;
+  right: 1px;
+  bottom: 1px;
+  width: 13px;
+  height: 13px;
+  padding: 0 2px 2px 0;
   border: none;
-  border-radius: 0 6px 6px 0;
+  border-radius: 0 0 6px 0;
   background: transparent;
-  color: var(--muted);
-  opacity: 0.55;
+  box-shadow: none;
+  transform: none;
   display: flex;
   align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 3px;
+  justify-content: flex-end;
+  color: var(--muted);
+  opacity: 0.6;
 }
 
 .tool-more svg {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
+  transition: transform var(--t-fast) var(--ease-out);
 }
 
 .tool-group:hover .tool-more,
@@ -1493,8 +1501,24 @@ body.light #timeframes {
 
 .tool-more:hover:not(:disabled),
 .tool-more.open {
-  background: var(--hover);
   color: var(--text);
+}
+
+.tool-more:hover:not(:disabled) svg,
+.tool-more.open svg {
+  transform: scale(1.35);
+  transform-origin: bottom right;
+}
+
+/* On the selected (blue) button the arrow takes the button's text color. */
+.tool-group:has(.tool.active) .tool-more {
+  color: var(--active-text);
+  opacity: 0.8;
+}
+
+/* Pressing the button presses the arrow with it. */
+.tool-group:has(.tool:active) .tool-more {
+  transform: translate(-1px, -1px);
 }
 
 /* --- drawings list (object tree) ------------------------------------------------------ */
@@ -1617,4 +1641,9 @@ body.light #timeframes {
 
 .dl-action.danger:hover:not(:disabled) {
   color: var(--loss);
+}
+
+/* While its menu is open, the group's button stays lit like on hover. */
+#sidebar .tool-group:has(.tool-more.open) .tool:not(.active) {
+  background: var(--hover);
 }
