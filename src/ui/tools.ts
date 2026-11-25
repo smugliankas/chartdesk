@@ -9,7 +9,15 @@ export const ICONS = {
   trend: svg('<path d="M4 19L20 5"/><circle cx="4" cy="19" r="1.6"/><circle cx="20" cy="5" r="1.6"/>'),
   ray: svg('<path d="M4 19L21 4"/><circle cx="4" cy="19" r="1.6"/><circle cx="12" cy="12" r="1.6"/>'),
   extended: svg('<path d="M2 21L22 3"/><circle cx="8" cy="15.6" r="1.6"/><circle cx="16" cy="8.4" r="1.6"/>'),
+  arrow: svg('<path d="M4 20L18 6"/><path d="M11 5h8v8"/>'),
   hline: svg('<path d="M3 12h18"/><circle cx="12" cy="12" r="1.6"/>'),
+  hray: svg('<path d="M7 12h14"/><circle cx="5.4" cy="12" r="1.6"/>'),
+  cross: svg('<path d="M3 12h18M12 3v18"/><circle cx="12" cy="12" r="1.6"/>'),
+  channel: svg('<path d="M3 15L16 4M8 20L21 9"/><path d="M5.5 17.5l13-11" stroke-dasharray="2 2.2"/>'),
+  pricerange: svg('<path d="M4 4h16M4 20h16M12 7v10M9 9.5L12 6.5l3 3M9 14.5l3 3 3-3"/>'),
+  daterange: svg('<path d="M4 4v16M20 4v16M7 12h10M9.5 9L6.5 12l3 3M14.5 9l3 3-3 3"/>'),
+  brush: svg('<path d="M3 17c3-6 5-6 7-2s4 4 6-2 3-5 5-4"/>'),
+  more: '<svg viewBox="0 0 8 8"><path d="M8 0v8H0z" fill="currentColor"/></svg>',
   vline: svg('<path d="M12 3v18"/><circle cx="12" cy="12" r="1.6"/>'),
   rect: svg('<rect x="4" y="6" width="16" height="12" rx="1"/>'),
   fib: svg('<path d="M3 5h18M3 9.5h18M3 13h18M3 19h18"/><path d="M5 19L19 5" stroke-dasharray="2 2"/>'),
@@ -29,6 +37,7 @@ export const ICONS = {
   unlock: svg('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 017.5-2"/>'),
   eye: svg('<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
   eyeOff: svg('<path d="M3 3l18 18M10.6 5.1A10 10 0 0112 5c6.5 0 10 7 10 7a17 17 0 01-3.2 4M6.6 6.6A17 17 0 002 12s3.5 7 10 7a10 10 0 004.4-1"/><path d="M9.9 9.9a3 3 0 004.2 4.2"/>'),
+  layers: svg('<path d="M12 4l9 5-9 5-9-5z"/><path d="M3 14l9 5 9-5"/>'),
   list: svg('<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>'),
   camera: svg('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
   toLatest: svg('<path d="M6 7l5 5-5 5M13 7l5 5-5 5"/>'),
@@ -42,24 +51,44 @@ export interface ToolDef {
   keyLabel?: string;
 }
 
-/** Tool buttons in the left toolbar; `null` draws a separator. */
-export const TOOLBAR: readonly (ToolDef | null)[] = [
+/** Every tool, with its name and Alt/Option shortcut. */
+export const TOOLS: readonly ToolDef[] = [
   { id: 'cursor', title: 'Cursor', keyLabel: 'Esc' },
-  null,
   { id: 'trend', title: 'Trend line', key: 'KeyT' },
   { id: 'ray', title: 'Ray' },
   { id: 'extended', title: 'Extended line' },
+  { id: 'arrow', title: 'Arrow' },
   { id: 'hline', title: 'Horizontal line', key: 'KeyH' },
+  { id: 'hray', title: 'Horizontal ray', key: 'KeyJ' },
   { id: 'vline', title: 'Vertical line', key: 'KeyV' },
-  null,
-  { id: 'rect', title: 'Rectangle', key: 'KeyR' },
+  { id: 'cross', title: 'Cross line', key: 'KeyC' },
   { id: 'fib', title: 'Fibonacci retracement', key: 'KeyF' },
-  null,
+  { id: 'channel', title: 'Parallel channel' },
+  { id: 'rect', title: 'Rectangle', key: 'KeyR' },
+  { id: 'brush', title: 'Brush' },
   { id: 'long', title: 'Long position', key: 'KeyL' },
   { id: 'short', title: 'Short position', key: 'KeyS' },
-  null,
-  { id: 'text', title: 'Text', key: 'KeyN' },
+  { id: 'pricerange', title: 'Price range' },
+  { id: 'daterange', title: 'Date range' },
   { id: 'measure', title: 'Measure', key: 'KeyM', keyLabel: 'Shift + click' },
+  { id: 'text', title: 'Text', key: 'KeyN' },
+];
+
+export function toolDef(id: ToolId): ToolDef {
+  return TOOLS.find((t) => t.id === id)!;
+}
+
+/**
+ * The left toolbar: one button per group, like TradingView. A group's button shows the tool
+ * used last from it; the small corner arrow opens the others.
+ */
+export const TOOL_GROUPS: readonly (readonly ToolId[])[] = [
+  ['cursor'],
+  ['trend', 'ray', 'extended', 'arrow', 'hline', 'hray', 'vline', 'cross'],
+  ['fib', 'channel'],
+  ['rect', 'brush'],
+  ['long', 'short', 'pricerange', 'daterange', 'measure'],
+  ['text'],
 ];
 
 export const ALT = IS_MAC ? '⌥' : 'Alt+';

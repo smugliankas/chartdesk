@@ -20,8 +20,10 @@ your machine.
 - Price alerts with sound, desktop notification and on-screen message; set from the bell menu,
   the bell next to the price scale, `Alt/⌥` + `A`, or on a horizontal or sloped line. Watched for all symbols while ChartDesk is open
 - Countdown to bar close in the last-price label (can be turned off in the settings)
-- Drawing tools: trend line, ray, extended line, horizontal and vertical lines, rectangle,
-  Fibonacci retracement, long/short position, text notes
+- Drawing tools: trend line, ray, extended line, arrow, horizontal line and ray, vertical line,
+  cross line, Fibonacci retracement, parallel channel, rectangle, brush, long/short position,
+  price range, date range, text notes. Grouped in the toolbar like TradingView
+- Drawings list: see every drawing on a symbol; select, hide, lock or delete it
 - Measure tool (`Shift` + click): price change, %, bars and time between two points
 - **No limit on the number of drawings**
 - Drawing styles: color, line width, solid/dashed/dotted lines, text size. Each tool remembers the last style you used
@@ -41,7 +43,8 @@ your machine.
 
 | Keys | Action |
 | --- | --- |
-| `Alt/⌥` + `T` `H` `V` `R` `F` `L` `S` `N` `M` | Trend line, horizontal line, vertical line, rectangle, Fibonacci, long, short, text, measure |
+| `Alt/⌥` + `T` `H` `J` `V` `C` | Trend line, horizontal line, horizontal ray, vertical line, cross line |
+| `Alt/⌥` + `R` `F` `L` `S` `N` `M` | Rectangle, Fibonacci, long, short, text, measure |
 | `Alt/⌥` + `A` | Alert at the cursor price |
 | Hold `⌘` (Mac) / `Ctrl` | Magnet while held: crosshair and drawing points snap to open/high/low/close |
 | `Shift` + click | Measure |

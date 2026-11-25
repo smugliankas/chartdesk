@@ -2,7 +2,7 @@ import { readable } from '../chart/appearance';
 import type { ChartController } from '../chart/ChartController';
 import { modifierHeld } from '../platform';
 import { DrawingsPrimitive, type DrawingSource } from './DrawingsPrimitive';
-import { distToSegment, extendSegment, handlesOf, moveHandle, moveWhole, type Part } from './geometry';
+import { distToPolyline, distToSegment, extendSegment, handlesOf, insideChannel, moveHandle, moveWhole, type Part } from './geometry';
 import {
   DEFAULT_COLORS,
   DEFAULT_FONT_SIZE,
@@ -10,6 +10,7 @@ import {
   fibLevelsOf,
   fibPrice,
   fibShowsTrendLine,
+  isOnePointType,
   isStraightLineType,
   isTwoPoint,
   isTwoPointType,
@@ -21,6 +22,7 @@ import {
   type Drawing,
   type DrawingStyle,
   type DrawingType,
+  type ParallelChannel,
   type Point,
   type TextNote,
   type ToolId,
@@ -59,6 +61,10 @@ export class DrawingManager implements DrawingSource {
 
   private tool: ToolId = 'cursor';
   private pending: Point | null = null;
+  /** Parallel channel: the base line, once its two points are placed; the third click sets the width. */
+  private channelBase: { p1: Point; p2: Point } | null = null;
+  /** Brush stroke being drawn (mouse held down). */
+  private stroke: Point[] | null = null;
   private measuring = false;
   private drag: DragState | null = null;
   private magnet = false;
@@ -193,6 +199,7 @@ export class DrawingManager implements DrawingSource {
     if (tool !== 'cursor' && tool !== 'measure' && this.hidden) this.setHidden(false);
     this.tool = tool;
     this.pending = null;
+    this.channelBase = null;
     this.preview = null;
     this.measuring = false;
     if (tool !== 'cursor') {
@@ -218,6 +225,7 @@ export class DrawingManager implements DrawingSource {
       this.drawings = loadDrawings(key);
       this.selectedId = null;
       this.pending = null;
+      this.channelBase = null;
       this.preview = null;
       this.measure = null;
       this.undoStack = [];
@@ -271,6 +279,7 @@ export class DrawingManager implements DrawingSource {
     const copy = moveWhole(structuredClone(source), (t) => this.cc.logicalToTime(this.cc.timeToLogical(t) + 5), 0);
     copy.id = newId();
     copy.locked = false;
+    copy.hidden = false;
     if (this.hidden) this.hidden = false;
     this.mutate(() => this.drawings.push(copy));
     this.selectedId = copy.id;
@@ -281,6 +290,31 @@ export class DrawingManager implements DrawingSource {
     if (!id) return;
     this.mutate(() => {
       this.drawings = this.drawings.map((d) => (d.id === id ? { ...d, locked: !d.locked } : d));
+    });
+  }
+
+  /** Hides or shows one drawing. A hidden drawing can't be selected on the chart. */
+  toggleVisibility(id: string): void {
+    this.mutate(() => {
+      this.drawings = this.drawings.map((d) => (d.id === id ? { ...d, hidden: !d.hidden } : d));
+      if (this.selectedId === id && this.drawings.find((d) => d.id === id)?.hidden) this.selectedId = null;
+    });
+  }
+
+  /** Selects a drawing by id (null to clear the selection). */
+  select(id: string | null): void {
+    const d = id ? this.drawings.find((x) => x.id === id) : null;
+    if (d?.hidden) return;
+    if (d && this.tool !== 'cursor') this.setTool('cursor');
+    this.selectedId = d ? d.id : null;
+    this.changed();
+  }
+
+  remove(id: string): void {
+    if (!this.drawings.some((d) => d.id === id)) return;
+    this.mutate(() => {
+      this.drawings = this.drawings.filter((d) => d.id !== id);
+      if (this.selectedId === id) this.selectedId = null;
     });
   }
 
@@ -434,6 +468,14 @@ export class DrawingManager implements DrawingSource {
     return { time: this.cc.logicalToTime(logical), price };
   }
 
+  /** Screen position → chart point without snapping to bars (for freehand strokes). */
+  private toExactPoint(x: number, y: number): Point | null {
+    const logical = this.cc.xToLogical(x);
+    const price = this.cc.yToPrice(y);
+    if (logical === null || price === null) return null;
+    return { time: this.cc.logicalToTime(logical), price };
+  }
+
   private xy(p: Point): { x: number; y: number } | null {
     const x = this.cc.timeToX(p.time);
     const y = this.cc.priceToY(p.price);
@@ -467,6 +509,20 @@ export class DrawingManager implements DrawingSource {
 
   private makeTwoPoint(type: TwoPointType, p1: Point, p2: Point): TwoPointDrawing {
     return { id: newId(), type, ...this.styleFor(type), p1, p2 };
+  }
+
+  /** A channel on `base`, as wide as needed to pass through the point at (x, y). */
+  private makeChannel(base: { p1: Point; p2: Point }, x: number, y: number): ParallelChannel {
+    let offset = 0;
+    const a = this.xy(base.p1);
+    const b = this.xy(base.p2);
+    const price = this.cc.yToPrice(y);
+    if (a && b && price !== null) {
+      const baseY = a.x === b.x ? a.y : a.y + ((b.y - a.y) * (x - a.x)) / (b.x - a.x);
+      const basePrice = this.cc.yToPrice(baseY);
+      if (basePrice !== null) offset = price - basePrice;
+    }
+    return { id: newId(), type: 'channel', ...this.styleFor('channel'), p1: base.p1, p2: base.p2, offset };
   }
 
   private makePosition(type: 'long' | 'short', entry: Point, y: number): Drawing {
@@ -558,12 +614,44 @@ export class DrawingManager implements DrawingSource {
     ta?.finish?.(keep);
   }
 
+  // --- brush ------------------------------------------------------------------------
+
+  private startStroke(x: number, y: number): void {
+    const pt = this.toExactPoint(x, y);
+    if (!pt) return;
+    this.stroke = [pt];
+    this.preview = { id: 'preview', type: 'brush', ...this.styleFor('brush'), points: this.stroke };
+    let last = { x, y };
+    const move = (e: MouseEvent) => {
+      const p = this.local(e);
+      if (Math.hypot(p.x - last.x, p.y - last.y) < 3) return; // skip tiny steps; keeps strokes small
+      const next = this.toExactPoint(p.x, p.y);
+      if (!next || !this.stroke) return;
+      last = { x: p.x, y: p.y };
+      this.stroke.push(next);
+      this.preview = { id: 'preview', type: 'brush', ...this.styleFor('brush'), points: [...this.stroke] };
+      this.redraw();
+    };
+    const up = () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+      const points = this.stroke ?? [];
+      this.stroke = null;
+      this.preview = null;
+      if (points.length >= 2) this.add({ id: newId(), type: 'brush', ...this.styleFor('brush'), points });
+      else this.redraw();
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    this.redraw();
+  }
+
   // --- hit testing ------------------------------------------------------------------
 
   private hitTest(x: number, y: number): { id: string; part: Part } | null {
     if (this.hidden) return null;
     // Selected drawing first, so its handles win over drawings underneath.
-    const order = [...this.drawings].reverse().sort((a, b) => Number(b.id === this.selectedId) - Number(a.id === this.selectedId));
+    const order = this.drawings.filter((d) => !d.hidden).reverse().sort((a, b) => Number(b.id === this.selectedId) - Number(a.id === this.selectedId));
     for (const d of order) {
       for (const h of d.locked ? [] : handlesOf(d)) {
         const p = this.xy(h.point);
@@ -588,6 +676,18 @@ export class DrawingManager implements DrawingSource {
         const xx = this.cc.timeToX(d.time);
         return xx !== null && Math.abs(xx - x) <= LINE_TOLERANCE;
       }
+      case 'hray': {
+        const p = this.xy(d.p);
+        return p !== null && x >= p.x - LINE_TOLERANCE && Math.abs(p.y - y) <= LINE_TOLERANCE;
+      }
+      case 'cross': {
+        const p = this.xy(d.p);
+        return p !== null && (Math.abs(p.y - y) <= LINE_TOLERANCE || Math.abs(p.x - x) <= LINE_TOLERANCE);
+      }
+      case 'brush': {
+        const pts = d.points.map((pt) => this.xy(pt)).filter((pt): pt is { x: number; y: number } => pt !== null);
+        return distToPolyline(x, y, pts) <= LINE_TOLERANCE;
+      }
       case 'text': {
         const p = this.xy(d.p);
         if (!p) return false;
@@ -611,13 +711,25 @@ export class DrawingManager implements DrawingSource {
 
     switch (d.type) {
       case 'trend':
+      case 'arrow':
         return distToSegment(x, y, a.x, a.y, b.x, b.y) <= LINE_TOLERANCE;
+      case 'channel': {
+        const top = this.cc.priceToY(d.p1.price + d.offset);
+        const dy = top === null ? 0 : top - a.y;
+        return (
+          insideChannel(x, y, a, b, dy) ||
+          distToSegment(x, y, a.x, a.y, b.x, b.y) <= LINE_TOLERANCE ||
+          distToSegment(x, y, a.x, a.y + dy, b.x, b.y + dy) <= LINE_TOLERANCE
+        );
+      }
       case 'ray':
       case 'extended': {
         const [x1, y1, x2, y2] = extendSegment(a.x, a.y, b.x, b.y, reach, d.type === 'extended');
         return distToSegment(x, y, x1, y1, x2, y2) <= LINE_TOLERANCE;
       }
       case 'rect':
+      case 'pricerange':
+      case 'daterange':
         return (
           x >= Math.min(a.x, b.x) - LINE_TOLERANCE &&
           x <= Math.max(a.x, b.x) + LINE_TOLERANCE &&
@@ -677,6 +789,22 @@ export class DrawingManager implements DrawingSource {
       if (!pt) return;
 
       if (tool === 'hline') return this.add({ id: newId(), type: 'hline', ...this.styleFor('hline'), price: pt.price });
+      if (isOnePointType(tool)) return this.add({ id: newId(), type: tool, ...this.styleFor(tool), p: pt });
+      if (tool === 'brush') return this.startStroke(x, y);
+      if (tool === 'channel') {
+        if (this.channelBase) return this.add(this.makeChannel(this.channelBase, x, y));
+        if (!this.pending) {
+          this.pending = pt;
+          this.preview = { id: 'preview', type: 'channel', ...this.styleFor('channel'), p1: pt, p2: pt, offset: 0 };
+        } else {
+          const end = e.shiftKey ? (this.constrain(this.pending, x, y) ?? pt) : pt;
+          this.channelBase = { p1: this.pending, p2: end };
+          this.pending = null;
+          this.preview = this.makeChannel(this.channelBase, x, y);
+        }
+        this.redraw();
+        return;
+      }
       if (tool === 'vline') return this.add({ id: newId(), type: 'vline', ...this.styleFor('vline'), time: pt.time });
       if (tool === 'long' || tool === 'short') return this.add(this.makePosition(tool, pt, y));
       if (tool === 'text') return this.openTextEditor(pt);
@@ -739,6 +867,16 @@ export class DrawingManager implements DrawingSource {
       return;
     }
 
+    if (this.tool === 'channel' && (this.pending || this.channelBase)) {
+      if (this.channelBase) this.preview = this.makeChannel(this.channelBase, x, y);
+      else if (this.pending) {
+        const pt = e.shiftKey ? this.constrain(this.pending, x, y) : this.toPoint(x, y);
+        if (pt) this.preview = { id: 'preview', type: 'channel', ...this.styleFor('channel'), p1: this.pending, p2: pt, offset: 0 };
+      }
+      this.redraw();
+      return;
+    }
+
     if (this.pending && isTwoPointType(this.tool)) {
       const pt = e.shiftKey && isStraightLineType(this.tool) ? this.constrain(this.pending, x, y) : this.toPoint(x, y);
       if (pt) {
@@ -784,7 +922,13 @@ export class DrawingManager implements DrawingSource {
     } else {
       const o = drag.original;
       // Shift keeps a line horizontal, vertical or at 45° around its other end.
-      const anchor = e.shiftKey && isStraightLineType(o.type) && isTwoPoint(o) ? (drag.part === 'p1' ? o.p2 : o.p1) : null;
+      const straight = (isStraightLineType(o.type) && isTwoPoint(o)) || o.type === 'channel';
+      const anchor =
+        e.shiftKey && straight && (drag.part === 'p1' || drag.part === 'p2') && 'p1' in o
+          ? drag.part === 'p1'
+            ? o.p2
+            : o.p1
+          : null;
       const pt = anchor ? this.constrain(anchor, x, y) : this.toPoint(x, y);
       if (!pt) return;
       next = moveHandle(o, drag.part, pt);
@@ -846,3 +990,4 @@ export class DrawingManager implements DrawingSource {
     }
   };
 }
+

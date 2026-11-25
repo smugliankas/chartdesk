@@ -4,6 +4,10 @@ export interface MenuItem {
   shortcut?: string;
   danger?: boolean;
   disabled?: boolean;
+  /** SVG markup shown before the label. */
+  icon?: string;
+  /** Highlighted as the current choice. */
+  checked?: boolean;
   action: () => void;
 }
 
@@ -11,10 +15,14 @@ export interface MenuItem {
 export type MenuEntry = MenuItem | null;
 
 let menu: HTMLDivElement | null = null;
+let onClose: (() => void) | null = null;
 
 function close(): void {
   menu?.remove();
   menu = null;
+  const fn = onClose;
+  onClose = null;
+  fn?.();
 }
 
 // One set of listeners for every menu: any click elsewhere, Esc, scrolling or resizing closes it.
@@ -34,9 +42,10 @@ function listen(): void {
 }
 
 /** Opens a right-click menu at the given screen position. */
-export function showContextMenu(clientX: number, clientY: number, entries: MenuEntry[]): void {
+export function showContextMenu(clientX: number, clientY: number, entries: MenuEntry[], closed?: () => void): void {
   listen();
   close();
+  onClose = closed ?? null;
   menu = document.createElement('div');
   menu.className = 'context-menu';
   menu.setAttribute('role', 'menu');
@@ -47,11 +56,18 @@ export function showContextMenu(clientX: number, clientY: number, entries: MenuE
       continue;
     }
     const item = document.createElement('button');
-    item.className = 'context-item' + (entry.danger ? ' danger' : '');
+    item.className = 'context-item' + (entry.danger ? ' danger' : '') + (entry.checked ? ' checked' : '');
     item.setAttribute('role', 'menuitem');
     item.disabled = !!entry.disabled;
     const label = document.createElement('span');
+    label.className = 'context-label';
     label.textContent = entry.label;
+    if (entry.icon) {
+      const icon = document.createElement('span');
+      icon.className = 'context-icon';
+      icon.innerHTML = entry.icon; // our own SVG markup, never user input
+      item.append(icon);
+    }
     item.append(label);
     if (entry.shortcut) {
       const key = document.createElement('span');

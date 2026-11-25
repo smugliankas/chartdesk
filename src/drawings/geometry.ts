@@ -1,7 +1,7 @@
 import type { Drawing, Point } from './model';
 
 /** A handle the user can grab to reshape a drawing. */
-export type HandlePart = 'p1' | 'p2' | 'entry' | 'tp' | 'sl' | 'end';
+export type HandlePart = 'p1' | 'p2' | 'p' | 'c1' | 'c2' | 'entry' | 'tp' | 'sl' | 'end';
 export type Part = HandlePart | 'body';
 
 /** Grabbable handles of a drawing, in chart coordinates. */
@@ -10,11 +10,24 @@ export function handlesOf(d: Drawing): { part: HandlePart; point: Point }[] {
     case 'trend':
     case 'ray':
     case 'extended':
+    case 'arrow':
     case 'rect':
     case 'fib':
+    case 'pricerange':
+    case 'daterange':
       return [
         { part: 'p1', point: d.p1 },
         { part: 'p2', point: d.p2 },
+      ];
+    case 'hray':
+    case 'cross':
+      return [{ part: 'p', point: d.p }];
+    case 'channel':
+      return [
+        { part: 'p1', point: d.p1 },
+        { part: 'p2', point: d.p2 },
+        { part: 'c1', point: { time: d.p1.time, price: d.p1.price + d.offset } },
+        { part: 'c2', point: { time: d.p2.time, price: d.p2.price + d.offset } },
       ];
     case 'long':
     case 'short':
@@ -35,9 +48,22 @@ export function moveHandle(d: Drawing, part: HandlePart, pt: Point): Drawing {
     case 'trend':
     case 'ray':
     case 'extended':
+    case 'arrow':
     case 'rect':
     case 'fib':
+    case 'pricerange':
+    case 'daterange':
       return part === 'p1' ? { ...d, p1: pt } : part === 'p2' ? { ...d, p2: pt } : d;
+    case 'hray':
+    case 'cross':
+      return part === 'p' ? { ...d, p: pt } : d;
+    case 'channel':
+      // The base line's ends move freely; the parallel line's ends only change the width.
+      if (part === 'p1') return { ...d, p1: pt };
+      if (part === 'p2') return { ...d, p2: pt };
+      if (part === 'c1') return { ...d, offset: pt.price - d.p1.price };
+      if (part === 'c2') return { ...d, offset: pt.price - d.p2.price };
+      return d;
     case 'long':
     case 'short': {
       // Same as TradingView: the entry handle (left edge, at the entry price) moves the entry
@@ -74,9 +100,18 @@ export function moveWhole(d: Drawing, shiftTime: (t: number) => number, dPrice: 
     case 'trend':
     case 'ray':
     case 'extended':
+    case 'arrow':
     case 'rect':
     case 'fib':
+    case 'pricerange':
+    case 'daterange':
+    case 'channel':
       return { ...d, p1: shift(d.p1), p2: shift(d.p2) };
+    case 'hray':
+    case 'cross':
+      return { ...d, p: shift(d.p) };
+    case 'brush':
+      return { ...d, points: d.points.map(shift) };
     case 'hline':
       return { ...d, price: d.price + dPrice };
     case 'vline':
@@ -119,4 +154,31 @@ export function distToSegment(px: number, py: number, ax: number, ay: number, bx
   if (len2 === 0) return Math.hypot(px - ax, py - ay);
   const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len2));
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+/** Distance from a point to a polyline (a freehand brush stroke). */
+export function distToPolyline(px: number, py: number, pts: readonly { x: number; y: number }[]): number {
+  if (pts.length === 0) return Infinity;
+  if (pts.length === 1) return Math.hypot(px - pts[0].x, py - pts[0].y);
+  let best = Infinity;
+  for (let i = 1; i < pts.length; i++) {
+    best = Math.min(best, distToSegment(px, py, pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y));
+  }
+  return best;
+}
+
+/**
+ * Whether (px, py) lies inside a parallel channel on screen: between the base line a→b and
+ * the same line moved by `dy` pixels, within the base line's horizontal extent.
+ */
+export function insideChannel(
+  px: number,
+  py: number,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  dy: number,
+): boolean {
+  if (px < Math.min(a.x, b.x) || px > Math.max(a.x, b.x)) return false;
+  const base = a.x === b.x ? a.y : a.y + ((b.y - a.y) * (px - a.x)) / (b.x - a.x);
+  return py >= Math.min(base, base + dy) && py <= Math.max(base, base + dy);
 }

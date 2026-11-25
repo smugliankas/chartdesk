@@ -18,6 +18,7 @@ import {
   fibPrice,
   fibShowsTrendLine,
   formatDuration,
+  formatVolume,
   measureText,
   TEXT_PADDING,
   textFont,
@@ -74,11 +75,13 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
   }
 
   updateAllViews(): void {
-    this.axisViews = (this.source.hidden ? [] : this.source.drawings)
-      .filter((d) => d.type === 'hline')
-      .map((d) => {
-        const y = this.cc.priceToY(d.price);
-        const text = this.cc.formatPrice(d.price);
+    this.axisViews = (this.source.hidden ? [] : this.source.drawings.filter((d) => !d.hidden))
+      .flatMap((d): { d: Drawing; price: number }[] =>
+        d.type === 'hline' ? [{ d, price: d.price }] : d.type === 'hray' || d.type === 'cross' ? [{ d, price: d.p.price }] : [],
+      )
+      .map(({ d, price }) => {
+        const y = this.cc.priceToY(price);
+        const text = this.cc.formatPrice(price);
         return {
           coordinate: () => y ?? -100,
           text: () => text,
@@ -105,7 +108,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       const size = { w: mediaSize.width, h: mediaSize.height };
       if (!hidden) {
         for (const d of drawings) {
-          if (d.id !== editingId) this.drawOne(ctx, size, d, d.id === selectedId);
+          if (d.id !== editingId && !d.hidden) this.drawOne(ctx, size, d, d.id === selectedId);
         }
       }
       if (preview) this.drawOne(ctx, size, preview, true);
@@ -141,6 +144,80 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       case 'vline': {
         const x = this.cc.timeToX(d.time);
         if (x !== null) line(ctx, x, 0, x, size.h);
+        break;
+      }
+
+      case 'hray': {
+        const p = this.xy(d.p);
+        if (p) line(ctx, p.x, p.y, size.w, p.y);
+        break;
+      }
+
+      case 'cross': {
+        const p = this.xy(d.p);
+        if (!p) break;
+        line(ctx, 0, p.y, size.w, p.y);
+        line(ctx, p.x, 0, p.x, size.h);
+        break;
+      }
+
+      case 'arrow': {
+        const a = this.xy(d.p1);
+        const b = this.xy(d.p2);
+        if (!a || !b) break;
+        const head = 8 + width * 2;
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        // Stop the shaft under the arrowhead, so a thick line doesn't poke through its tip.
+        const k = len > head ? (len - head * 0.6) / len : 0;
+        line(ctx, a.x, a.y, a.x + (b.x - a.x) * k, a.y + (b.y - a.y) * k);
+        arrowHead(ctx, a.x, a.y, b.x, b.y, head);
+        break;
+      }
+
+      case 'channel': {
+        const a = this.xy(d.p1);
+        const b = this.xy(d.p2);
+        const a2 = this.xy({ time: d.p1.time, price: d.p1.price + d.offset });
+        const b2 = this.xy({ time: d.p2.time, price: d.p2.price + d.offset });
+        if (!a || !b || !a2 || !b2) break;
+        ctx.globalAlpha = 0.1;
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.lineTo(b2.x, b2.y);
+        ctx.lineTo(a2.x, a2.y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        line(ctx, a.x, a.y, b.x, b.y);
+        line(ctx, a2.x, a2.y, b2.x, b2.y);
+        ctx.save();
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.7;
+        ctx.setLineDash([4, 4]);
+        line(ctx, (a.x + a2.x) / 2, (a.y + a2.y) / 2, (b.x + b2.x) / 2, (b.y + b2.y) / 2);
+        ctx.restore();
+        break;
+      }
+
+      case 'pricerange':
+      case 'daterange': {
+        const a = this.xy(d.p1);
+        const b = this.xy(d.p2);
+        if (!a || !b) break;
+        this.drawRange(ctx, d.type, d.p1, d.p2, a, b, color);
+        break;
+      }
+
+      case 'brush': {
+        const pts = d.points.map((p) => this.xy(p)).filter((p): p is { x: number; y: number } => p !== null);
+        if (pts.length < 2) break;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (const p of pts.slice(1)) ctx.lineTo(p.x, p.y);
+        ctx.stroke();
         break;
       }
 
@@ -236,6 +313,68 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     ctx.restore();
   }
 
+  /** Price range: the distance between two prices. Date range: the bars and time between two dates. */
+  private drawRange(
+    ctx: CanvasRenderingContext2D,
+    kind: 'pricerange' | 'daterange',
+    p1: Point,
+    p2: Point,
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+    color: string,
+  ): void {
+    const left = Math.min(a.x, b.x);
+    const right = Math.max(a.x, b.x);
+    const top = Math.min(a.y, b.y);
+    const bottom = Math.max(a.y, b.y);
+    ctx.globalAlpha = 0.12;
+    ctx.fillRect(left, top, right - left, bottom - top);
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([]);
+
+    let text: string;
+    let labelY: number;
+    let where: 'above' | 'below';
+    if (kind === 'pricerange') {
+      line(ctx, left, a.y, right, a.y);
+      line(ctx, left, b.y, right, b.y);
+      const cx = (left + right) / 2;
+      line(ctx, cx, a.y, cx, b.y);
+      if (Math.abs(b.y - a.y) > 10) arrowHead(ctx, cx, a.y, cx, b.y, 7);
+      const diff = p2.price - p1.price;
+      const pct = p1.price !== 0 ? (diff / p1.price) * 100 : 0;
+      const sign = diff >= 0 ? '+' : '−';
+      text = `${sign}${this.cc.formatPrice(Math.abs(diff))} (${sign}${Math.abs(pct).toFixed(2)}%)`;
+      // Label beyond the end point, like TradingView: above when the range goes up.
+      where = b.y <= a.y ? 'above' : 'below';
+      labelY = where === 'above' ? top : bottom;
+    } else {
+      line(ctx, a.x, top, a.x, bottom);
+      line(ctx, b.x, top, b.x, bottom);
+      const cy = (top + bottom) / 2;
+      line(ctx, a.x, cy, b.x, cy);
+      if (Math.abs(b.x - a.x) > 10) arrowHead(ctx, a.x, cy, b.x, cy, 7);
+      const i1 = this.cc.timeToLogical(p1.time);
+      const i2 = this.cc.timeToLogical(p2.time);
+      const bars = Math.round(i2 - i1);
+      let volume = 0;
+      let hasVolume = false;
+      for (let i = Math.round(Math.min(i1, i2)); i <= Math.round(Math.max(i1, i2)); i++) {
+        const c = this.cc.candleAt(i);
+        if (c?.volume !== undefined) {
+          volume += c.volume;
+          hasVolume = true;
+        }
+      }
+      text = `${bars} bars, ${bars < 0 ? '−' : ''}${formatDuration(p2.time - p1.time)}`;
+      if (hasVolume) text += `\nVol ${formatVolume(volume)}`;
+      where = 'below';
+      labelY = bottom;
+    }
+    label(ctx, text, (left + right) / 2, labelY, where, color);
+  }
+
   private drawPosition(ctx: CanvasRenderingContext2D, d: Position): void {
     const x1 = this.cc.timeToX(d.entry.time);
     const x2 = this.cc.timeToX(d.endTime);
@@ -319,6 +458,21 @@ function setDash(ctx: CanvasRenderingContext2D, style: LineStyle, width: number)
     ctx.lineCap = 'round';
     ctx.setLineDash([0.1, 2.5 * width + 1.5]);
   } else ctx.setLineDash([]);
+}
+
+/** A filled arrowhead at (x2, y2), pointing away from (x1, y1). */
+function arrowHead(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, size: number): void {
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - size * Math.cos(angle - Math.PI / 7), y2 - size * Math.sin(angle - Math.PI / 7));
+  ctx.lineTo(x2 - size * Math.cos(angle + Math.PI / 7), y2 - size * Math.sin(angle + Math.PI / 7));
+  ctx.closePath();
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.fill();
+  ctx.restore();
 }
 
 function handle(ctx: CanvasRenderingContext2D, x: number, y: number, fill: string): void {

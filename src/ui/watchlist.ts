@@ -7,44 +7,28 @@ export interface WatchItem {
 }
 
 interface Saved {
-  open: boolean;
   items: WatchItem[];
-  /** Panel width in pixels. */
-  width?: number;
 }
 
 interface Options {
-  /** Element the panel is added to (#body). */
-  host: HTMLElement;
-  /** Top bar button that shows and hides the panel. */
-  toggleButton: HTMLButtonElement;
   /** Data source used for new entries and quotes. */
   providerId: string;
   /** The symbol on the chart, to highlight its row. */
   current: () => WatchItem;
   /** Switches the chart to a symbol. */
   onSelect: (item: WatchItem) => void;
-  /** Called after the panel opens or closes (the chart resizes). */
-  onToggle?: () => void;
 }
 
 const KEY = 'chartdesk:watchlist';
-const DEFAULT_WIDTH = 260;
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 560;
 const DEFAULT_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT'];
 
 function load(providerId: string): Saved {
-  const fallback: Saved = { open: true, items: DEFAULT_SYMBOLS.map((symbol) => ({ providerId, symbol })) };
+  const fallback: Saved = { items: DEFAULT_SYMBOLS.map((symbol) => ({ providerId, symbol })) };
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
     const saved = JSON.parse(raw) as Partial<Saved>;
-    return {
-      open: saved.open ?? true,
-      items: Array.isArray(saved.items) ? saved.items : fallback.items,
-      width: typeof saved.width === 'number' ? saved.width : undefined,
-    };
+    return { items: Array.isArray(saved.items) ? saved.items : fallback.items };
   } catch {
     return fallback;
   }
@@ -62,11 +46,17 @@ function formatQuotePrice(p: number, decimals?: number): string {
   return p.toFixed(8);
 }
 
-/** Right-hand panel with live prices of a list of symbols. Click a row to open it on the chart. */
-export function createWatchlist({ host, toggleButton, providerId, current, onSelect, onToggle }: Options): { sync: () => void } {
+/** Watchlist view for the right panel: live prices of a list of symbols. Click a row to open it on the chart. */
+export function createWatchlist({ providerId, current, onSelect }: Options): {
+  element: HTMLElement;
+  show: () => void;
+  hide: () => void;
+  sync: () => void;
+} {
   const state = load(providerId);
   const quotes = new Map<string, Quote>();
   let stopQuotes: (() => void) | null = null;
+  let visible = false;
 
   const save = () => {
     try {
@@ -76,55 +66,16 @@ export function createWatchlist({ host, toggleButton, providerId, current, onSel
     }
   };
 
-  const panel = document.createElement('aside');
+  const panel = document.createElement('section');
+  panel.className = 'panel-view';
   panel.id = 'watchlist';
   panel.innerHTML = `
-    <div class="wl-resize"></div>
     <div class="wl-header">
       <h3>Watchlist</h3>
       <div class="symbol-box wl-add"><input type="text" spellcheck="false" autocomplete="off" placeholder="Add symbol…" /></div>
     </div>
     <div class="wl-columns"><span>Symbol</span><span>Last</span><span>24h</span></div>
     <div class="wl-rows"></div>`;
-  host.append(panel);
-  const resizeEl = panel.querySelector<HTMLDivElement>('.wl-resize')!;
-  const applyWidth = () => {
-    panel.style.width = `${Math.round(state.width ?? DEFAULT_WIDTH)}px`;
-  };
-  applyWidth();
-
-  // Drag the left edge to resize, like TradingView's right panel. Double-click resets it.
-  resizeEl.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    resizeEl.setPointerCapture(e.pointerId);
-    const startX = e.clientX;
-    const startWidth = panel.getBoundingClientRect().width;
-    panel.classList.add('resizing');
-    const move = (ev: PointerEvent) => {
-      const maxWidth = Math.min(MAX_WIDTH, window.innerWidth * 0.6);
-      state.width = Math.max(MIN_WIDTH, Math.min(maxWidth, startWidth + (startX - ev.clientX)));
-      applyWidth();
-    };
-    const up = () => {
-      resizeEl.removeEventListener('pointermove', move);
-      resizeEl.removeEventListener('pointerup', up);
-      resizeEl.removeEventListener('pointercancel', up);
-      panel.classList.remove('resizing');
-      save();
-    };
-    resizeEl.addEventListener('pointermove', move);
-    resizeEl.addEventListener('pointerup', up);
-    resizeEl.addEventListener('pointercancel', up);
-  });
-  // No text selection from (double-)clicking the edge.
-  resizeEl.addEventListener('mousedown', (e) => e.preventDefault());
-  resizeEl.addEventListener('dblclick', () => {
-    window.getSelection()?.removeAllRanges();
-    state.width = undefined;
-    applyWidth();
-    save();
-  });
 
   const rowsEl = panel.querySelector<HTMLDivElement>('.wl-rows')!;
   const addInput = panel.querySelector<HTMLInputElement>('.wl-add input')!;
@@ -205,31 +156,27 @@ export function createWatchlist({ host, toggleButton, providerId, current, onSel
     }
   }
 
+  /** Prices stream only while the watchlist is on screen. */
   function restartQuotes(): void {
     stopQuotes?.();
     stopQuotes = null;
-    if (!state.open || !provider.watchQuotes) return;
+    if (!visible || !provider.watchQuotes) return;
     const symbols = state.items.filter((i) => i.providerId === providerId).map((i) => i.symbol);
     stopQuotes = provider.watchQuotes(symbols, (q) => showQuote(q));
   }
 
-  function applyOpen(): void {
-    panel.classList.toggle('hidden', !state.open);
-    toggleButton.classList.toggle('active', state.open);
-    restartQuotes();
-    onToggle?.();
-  }
-
-  toggleButton.addEventListener('click', () => {
-    state.open = !state.open;
-    save();
-    applyOpen();
-  });
-
   render();
-  applyOpen();
 
   return {
+    element: panel,
+    show: () => {
+      visible = true;
+      restartQuotes();
+    },
+    hide: () => {
+      visible = false;
+      restartQuotes();
+    },
     /** Re-highlights the current symbol. */
     sync: () => {
       const cur = current();

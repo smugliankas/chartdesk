@@ -26,9 +26,11 @@ import { createSettingsDialog } from './ui/settingsDialog';
 import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
 import { canvasToBlob, copyImage, renderSnapshot, snapshotFileName } from './ui/snapshot';
+import { createDrawingsList } from './ui/drawingsList';
+import { createRightPanel } from './ui/rightPanel';
 import { createWatchlist } from './ui/watchlist';
 import { installTooltips } from './ui/tooltips';
-import { ALT, HOLD, ICONS, MOD, TOOLBAR, toolTitle } from './ui/tools';
+import { ALT, HOLD, ICONS, MOD, TOOL_GROUPS, TOOLS, toolDef, toolTitle } from './ui/tools';
 
 // --- elements ----------------------------------------------------------------
 
@@ -60,13 +62,15 @@ interface Settings {
   symbols: Record<string, string>;
   magnet: boolean;
   drawingsHidden: boolean;
+  /** The tool each toolbar group shows, by the group's first tool. */
+  toolGroups: Partial<Record<ToolId, ToolId>>;
 }
 
 const SETTINGS_KEY = 'chartdesk:settings';
 const OLD_SETTINGS_KEY = 'chart-app:settings'; // before the project was named ChartDesk
 
 function loadSettings(): Settings {
-  const fallback: Settings = { provider: 'binance', timeframe: '1h', symbols: { binance: 'BTCUSDT' }, magnet: false, drawingsHidden: false };
+  const fallback: Settings = { provider: 'binance', timeframe: '1h', symbols: { binance: 'BTCUSDT' }, magnet: false, drawingsHidden: false, toolGroups: {} };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY) ?? localStorage.getItem(OLD_SETTINGS_KEY);
     return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<Settings>) } : fallback;
@@ -227,7 +231,6 @@ function errorMessage(err: unknown): string {
 
 // --- left toolbar ------------------------------------------------------------------
 
-const toolButtons = new Map<ToolId, HTMLButtonElement>();
 
 function sidebarButton(icon: string, title: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement('button');
@@ -243,15 +246,78 @@ function separator(): void {
   sidebar.append(Object.assign(document.createElement('div'), { className: 'sep' }));
 }
 
-for (const t of TOOLBAR) {
-  if (!t) {
-    separator();
-    continue;
+/** One toolbar button per group of tools; it shows the group's last-used tool. */
+interface ToolGroupButton {
+  tools: readonly ToolId[];
+  current: ToolId;
+  button: HTMLButtonElement;
+  more: HTMLButtonElement | null;
+}
+
+const toolGroups: ToolGroupButton[] = [];
+
+function showGroupTool(g: ToolGroupButton): void {
+  const def = toolDef(g.current);
+  g.button.innerHTML = ICONS[def.id];
+  g.button.dataset.tip = toolTitle(def);
+  g.button.removeAttribute('title');
+}
+
+/** Makes `id` the tool its group's button shows (and remembers it). */
+function showInGroup(id: ToolId): void {
+  const g = toolGroups.find((x) => x.tools.includes(id));
+  if (!g || g.current === id) return;
+  g.current = id;
+  showGroupTool(g);
+  settings.toolGroups[g.tools[0]] = id;
+  saveSettings();
+}
+
+function pickTool(id: ToolId): void {
+  showInGroup(id);
+  drawings.setTool(id);
+}
+
+for (const [i, tools] of TOOL_GROUPS.entries()) {
+  const saved = settings.toolGroups[tools[0]];
+  const g: ToolGroupButton = {
+    tools,
+    current: saved && tools.includes(saved) ? saved : tools[0],
+    button: document.createElement('button'),
+    more: null,
+  };
+  const wrap = document.createElement('div');
+  wrap.className = 'tool-group';
+  g.button.className = 'tool';
+  g.button.addEventListener('click', () => drawings.setTool(drawings.currentTool === g.current && g.current !== 'cursor' ? 'cursor' : g.current));
+  wrap.append(g.button);
+  if (tools.length > 1) {
+    const more = document.createElement('button');
+    more.className = 'tool-more';
+    more.innerHTML = ICONS.more;
+    more.setAttribute('aria-label', 'More tools');
+    more.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = wrap.getBoundingClientRect();
+      more.classList.add('open');
+      showContextMenu(
+        r.right + 6,
+        r.top,
+        tools.map((id) => {
+          const def = toolDef(id);
+          const keys = [def.key && `${ALT}${def.key.replace('Key', '')}`, def.keyLabel].filter(Boolean).join(', ');
+          return { label: def.title, icon: ICONS[id], shortcut: keys || undefined, checked: id === drawings.currentTool, action: () => pickTool(id) };
+        }),
+        () => more.classList.remove('open'),
+      );
+    });
+    wrap.append(more);
+    g.more = more;
   }
-  const b = sidebarButton(ICONS[t.id], toolTitle(t), () =>
-    drawings.setTool(drawings.currentTool === t.id && t.id !== 'cursor' ? 'cursor' : t.id),
-  );
-  toolButtons.set(t.id, b);
+  sidebar.append(wrap);
+  showGroupTool(g);
+  toolGroups.push(g);
+  if (i === 0) separator();
 }
 separator();
 const magnetButton = sidebarButton(ICONS.magnet, `Magnet: snap to open/high/low/close (hold ${HOLD})`, () => {
@@ -292,13 +358,21 @@ function addAlertAt(price: number, drawingId?: string): void {
   setStatus(`Alert set: ${symbol} crossing ${cc.formatPrice(price)}`);
 }
 
-const ALERTABLE: readonly Drawing['type'][] = ['hline', 'trend', 'ray', 'extended'];
+const ALERTABLE: readonly Drawing['type'][] = ['hline', 'hray', 'cross', 'trend', 'ray', 'extended', 'arrow'];
+
+/** The fixed alert level of a horizontal drawing, if it is one. */
+function levelOf(d: Drawing): number | null {
+  if (d.type === 'hline') return d.price;
+  if (d.type === 'hray' || d.type === 'cross') return d.p.price;
+  return null;
+}
 
 /** Alert on a drawing: a fixed level for a horizontal line, a moving level for a sloped line. */
 function addDrawingAlert(d: Drawing): void {
   if (!canAlert()) return;
-  if (d.type === 'hline') return addAlertAt(d.price, d.id);
-  if (d.type !== 'trend' && d.type !== 'ray' && d.type !== 'extended') return;
+  const level = levelOf(d);
+  if (level !== null) return addAlertAt(level, d.id);
+  if (d.type !== 'trend' && d.type !== 'ray' && d.type !== 'extended' && d.type !== 'arrow') return;
   const line = { kind: d.type, p1: d.p1, p2: d.p2 };
   const a = alerts.add({
     providerId: provider.id,
@@ -351,9 +425,10 @@ function syncLineAlerts(): void {
     const d = drawings.drawings.find((x) => x.id === a.drawingId);
     if (!d || !ALERTABLE.includes(d.type)) {
       alerts.remove(a.id);
-    } else if (d.type === 'hline') {
-      if (d.price !== a.price) alerts.update(a.id, { price: d.price, priceText: cc.formatPrice(d.price) });
-    } else if (d.type === 'trend' || d.type === 'ray' || d.type === 'extended') {
+    } else if (levelOf(d) !== null) {
+      const level = levelOf(d)!;
+      if (level !== a.price) alerts.update(a.id, { price: level, priceText: cc.formatPrice(level) });
+    } else if (d.type === 'trend' || d.type === 'ray' || d.type === 'extended' || d.type === 'arrow') {
       const l = a.line;
       const moved = !l || l.p1.time !== d.p1.time || l.p1.price !== d.p1.price || l.p2.time !== d.p2.time || l.p2.price !== d.p2.price;
       if (moved) {
@@ -437,7 +512,9 @@ alerts.onChange(() => {
 });
 
 drawings.onToolChange((tool) => {
-  for (const [id, b] of toolButtons) b.classList.toggle('active', id === tool);
+  // A tool picked by shortcut becomes its group's tool, like picking it from the menu.
+  showInGroup(tool);
+  for (const x of toolGroups) x.button.classList.toggle('active', x.current === tool);
 });
 drawings.onChange(() => {
   syncLineAlerts();
@@ -468,7 +545,7 @@ window.addEventListener('keydown', (e) => {
     if (price !== undefined) addAlertAt(price);
     return;
   }
-  const t = TOOLBAR.find((d) => d?.key === e.code);
+  const t = TOOLS.find((d) => d.key === e.code);
   if (t) {
     e.preventDefault();
     drawings.setTool(t.id);
@@ -754,16 +831,26 @@ const settingsButton = $<HTMLButtonElement>('settings');
 settingsButton.innerHTML = ICONS.settings;
 settingsButton.addEventListener('click', () => settingsDialog.open());
 
+// --- right panel: watchlist and drawings list ---------------------------------------
+
 const watchlistButton = $<HTMLButtonElement>('watchlistToggle');
 watchlistButton.innerHTML = ICONS.list;
+const drawingsListButton = $<HTMLButtonElement>('drawingsToggle');
+drawingsListButton.innerHTML = ICONS.layers;
 const watchlist = createWatchlist({
-  host: $('body'),
-  toggleButton: watchlistButton,
   providerId: 'binance',
   current: () => ({ providerId: provider.id, symbol }),
   onSelect: (item) => selectSymbol(item.providerId, item.symbol),
-  onToggle: () => requestAnimationFrame(syncControls),
 });
+const drawingsList = createDrawingsList({ drawings, formatPrice: (p) => cc.formatPrice(p), symbol: () => symbol });
+createRightPanel(
+  $('body'),
+  [
+    { id: 'watchlist', button: watchlistButton, ...watchlist },
+    { id: 'drawings', button: drawingsListButton, ...drawingsList },
+  ],
+  () => requestAnimationFrame(syncControls),
+);
 
 const aboutButton = $<HTMLButtonElement>('about');
 aboutButton.innerHTML = ICONS.info;
@@ -773,7 +860,7 @@ aboutDialog.addEventListener('click', (e) => {
 });
 
 const shortcuts: [string, string][] = [
-  ...TOOLBAR.filter((t) => t?.key).map((t) => [`${ALT}${t!.key!.replace('Key', '')}`, t!.title] as [string, string]),
+  ...TOOLS.filter((t) => t.key).map((t) => [`${ALT}${t.key!.replace('Key', '')}`, t.title] as [string, string]),
   ['Shift + click', 'Measure'],
   [`${ALT}A`, 'Alert at the cursor price'],
   [`Hold ${HOLD}`, 'Magnet while held (snap to open/high/low/close)'],

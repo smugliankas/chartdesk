@@ -10,6 +10,15 @@
   it to paste anywhere (⇧⌘S / Ctrl+Shift+S). The image has a header with the symbol,
   timeframe and last bar, and leaves out the selection handles.
 - Icon for the browser tab, and a description for link previews.
+- New drawing tools: horizontal ray (⌥J), cross line (⌥C), arrow, parallel channel (three
+  clicks: two for the base line, one for the width), price range, date range (bars, time and
+  volume) and brush. Horizontal rays, cross lines and arrows can carry alerts.
+- The left toolbar groups tools like TradingView: each button shows the tool used last from its
+  group, and the small corner arrow opens the others.
+- Drawings list: the layers button in the top bar lists every drawing on the symbol. Click one
+  to select it; hide, lock or delete it from its row. Hidden drawings stay saved.
+- The watchlist and the drawings list share the right panel; it remembers which one was open
+  and its width.
 - Watchlist: a panel on the right (list button in the top bar) with live price and 24h change
   for your symbols. Click a row to open it on the chart; add symbols with the search box,
   remove them with ×. Prices use each market's own decimals and flash green or red when they

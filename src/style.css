@@ -1178,6 +1178,7 @@ body.light #timeframes {
 
 .context-item {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   width: 100%;
@@ -1201,6 +1202,31 @@ body.light #timeframes {
   color: var(--loss);
 }
 
+.context-icon {
+  display: flex;
+  margin-right: -14px; /* closer to the label than the shortcut gap */
+  color: var(--muted);
+}
+
+.context-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.context-label {
+  flex: 1;
+}
+
+.context-item.checked,
+.context-item.checked:hover:not(:disabled) {
+  background: var(--active-bg), var(--panel);
+  color: var(--active-text);
+}
+
+.context-item.checked .context-icon {
+  color: inherit;
+}
+
 .context-shortcut {
   color: var(--muted);
   font-size: 12px;
@@ -1220,7 +1246,7 @@ body.light #timeframes {
 
 /* --- watchlist ------------------------------------------------------------------- */
 
-#watchlist {
+#rightPanel {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -1232,8 +1258,17 @@ body.light #timeframes {
   min-height: 0;
 }
 
-#watchlist.hidden {
+#rightPanel.hidden,
+.panel-view.hidden {
   display: none;
+}
+
+.panel-view {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .wl-header {
@@ -1328,7 +1363,7 @@ body.light #timeframes {
 }
 
 /* Grab area on the left edge for resizing; shows a thin accent line on hover. */
-.wl-resize {
+.panel-resize {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -1340,7 +1375,7 @@ body.light #timeframes {
   user-select: none;
 }
 
-.wl-resize::after {
+.panel-resize::after {
   content: '';
   position: absolute;
   top: 0;
@@ -1352,12 +1387,12 @@ body.light #timeframes {
   transition: opacity 0.12s ease;
 }
 
-.wl-resize:hover::after,
-#watchlist.resizing .wl-resize::after {
+.panel-resize:hover::after,
+#rightPanel.resizing .panel-resize::after {
   opacity: 0.8;
 }
 
-#watchlist.resizing {
+#rightPanel.resizing {
   user-select: none;
 }
 
@@ -1418,4 +1453,168 @@ body.light #timeframes {
   .wl-price.flash-down {
     animation: none;
   }
+}
+
+/* --- Tool groups in the left toolbar ------------------------------------------------ */
+
+.tool-group {
+  position: relative;
+  display: flex;
+}
+
+/* Small corner arrow that opens the group's other tools, like TradingView. */
+.tool-more {
+  position: absolute;
+  right: -3px;
+  top: 0;
+  bottom: 0;
+  width: 11px;
+  padding: 0;
+  border: none;
+  border-radius: 0 6px 6px 0;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0.55;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 3px;
+}
+
+.tool-more svg {
+  width: 7px;
+  height: 7px;
+}
+
+.tool-group:hover .tool-more,
+.tool-more.open {
+  opacity: 1;
+}
+
+.tool-more:hover:not(:disabled),
+.tool-more.open {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* --- drawings list (object tree) ------------------------------------------------------ */
+
+.dl-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dl-header h3 {
+  margin-bottom: 0;
+}
+
+.dl-count {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dl-rows {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 4px 0;
+}
+
+.dl-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 6px 0 10px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.dl-row:hover {
+  background: var(--hover);
+}
+
+.dl-row.current {
+  background: var(--active-bg), var(--panel);
+  border-left-color: var(--accent);
+}
+
+.dl-row.is-hidden .dl-icon,
+.dl-row.is-hidden .dl-name {
+  opacity: 0.45;
+}
+
+.dl-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--text);
+}
+
+.dl-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.dl-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dl-detail {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dl-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.dl-action {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+
+.dl-action svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Hide/lock stay visible while they are on, so a hidden or locked drawing is easy to spot. */
+.dl-row:hover .dl-action,
+.dl-action.on {
+  opacity: 1;
+}
+
+.dl-action.on {
+  color: var(--text);
+}
+
+.dl-action:hover:not(:disabled) {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.dl-action.danger:hover:not(:disabled) {
+  color: var(--loss);
 }

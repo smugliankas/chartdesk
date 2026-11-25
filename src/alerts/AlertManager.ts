@@ -18,7 +18,7 @@ export interface PriceAlert {
   line?: AlertLine;
 }
 
-export type AlertLineKind = 'trend' | 'ray' | 'extended';
+export type AlertLineKind = 'trend' | 'ray' | 'extended' | 'arrow';
 
 export interface AlertLine {
   kind: AlertLineKind;
@@ -26,7 +26,7 @@ export interface AlertLine {
   p2: Point;
 }
 
-const LINE_NAMES: Record<AlertLineKind, string> = { trend: 'trend line', ray: 'ray', extended: 'extended line' };
+const LINE_NAMES: Record<AlertLineKind, string> = { trend: 'trend line', ray: 'ray', extended: 'extended line', arrow: 'arrow' };
 
 /** Alert level at a time (UNIX seconds). For a sloped line this is the line's price at that time. */
 export function alertPriceAt(a: PriceAlert, time: number): number {
