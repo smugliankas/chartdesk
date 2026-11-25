@@ -1123,10 +1123,6 @@ body.light #tooltip {
     transform: none;
   }
 
-  .select-chevron {
-    transition: none;
-  }
-
   /* The loading line glows in place instead of sliding. */
   #loadingBar::before {
     left: 0;
@@ -1861,15 +1857,18 @@ body.light #timeframes {
 .select-chevron {
   flex: none;
   color: var(--muted);
-  transition: transform var(--t-med) var(--ease-out);
 }
 
-.select-button.open {
+.select-button.open,
+.select-button.open:hover:not(:disabled) {
   border-color: var(--accent);
 }
 
-.select-button.open .select-chevron {
-  transform: rotate(180deg);
+/* Keyboard focus: the same soft ring as the text boxes, not the browser's own. */
+.select-button:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.18);
 }
 
 .sb-group .select-button,

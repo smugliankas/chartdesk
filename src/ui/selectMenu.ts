@@ -124,12 +124,16 @@ export function enhanceSelect(select: HTMLSelectElement): void {
     menu.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
   };
 
+  // The browser focuses the button on its own; focusing it from code would make the browser
+  // draw its thick keyboard-focus ring after a mouse click.
   button.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
-    e.preventDefault(); // keep the click from stealing focus before we toggle
-    button.focus();
     if (isOpen()) close();
     else open();
+  });
+  // Safari doesn't focus buttons on click, so blur never comes: close on a click elsewhere.
+  document.addEventListener('pointerdown', (e) => {
+    if (isOpen() && !box.contains(e.target as Node)) close();
   });
   button.addEventListener('click', (e) => {
     // Keyboard "click" (Enter/Space are handled below; this catches assistive tech).
