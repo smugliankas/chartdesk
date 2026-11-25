@@ -1458,13 +1458,18 @@ body.light #timeframes {
 /* --- Tool groups in the left toolbar ------------------------------------------------ */
 
 /*
- * Each group is its button plus a thin strip on its right, as tall as the button, that opens
- * the group's other tools. Single tools and the buttons below get the same space on the right,
- * so every button lines up.
+ * A group is its button plus a thin strip on its right that opens the group's other tools.
+ * Hover and selection light up both as one box, with a hairline between them. Single tools
+ * and the buttons below get the same space on the right, so every button lines up.
  */
 .tool-group {
+  position: relative;
   display: flex;
-  gap: 1px;
+  border-radius: 6px;
+  transition:
+    background-color var(--t-fast) ease,
+    box-shadow var(--t-fast) ease,
+    transform 90ms ease;
 }
 
 .tool-group.single,
@@ -1472,14 +1477,47 @@ body.light #timeframes {
   margin-right: 11px;
 }
 
+.tool-group:not(.single):hover,
+.tool-group:has(.tool-more.open) {
+  background: var(--hover);
+}
+
+.tool-group:not(.single):has(.tool.active) {
+  background: var(--active-bg), var(--panel);
+  box-shadow:
+    inset 0 0 0 1px var(--active-border),
+    var(--active-glow);
+}
+
+/* The button and the strip draw nothing themselves; the group does. */
+#sidebar .tool-group:not(.single) > .tool,
+#sidebar .tool-group:not(.single) > .tool:hover:not(:disabled),
+#sidebar .tool-group:not(.single) > .tool.active,
+#sidebar .tool-group:not(.single) > .tool.active:hover:not(:disabled),
+#sidebar .tool-group:not(.single) > .tool:active:not(:disabled) {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+#sidebar .tool-group:not(.single) > .tool.active {
+  color: var(--active-text);
+}
+
+/* Pressing the button presses the whole box. */
+.tool-group:not(.single):has(.tool:active) {
+  transform: scale(0.96);
+}
+
 .tool-more,
 .tool-more:hover:not(:disabled),
 .tool-more:active:not(:disabled) {
-  width: 10px;
+  width: 11px;
   height: 34px;
   padding: 0;
   border: none;
-  border-radius: 4px;
+  border-radius: 0 6px 6px 0;
+  background: transparent;
   box-shadow: none;
   transform: none;
   display: flex;
@@ -1487,10 +1525,34 @@ body.light #timeframes {
   justify-content: center;
 }
 
+.tool-more,
+.tool-more:hover:not(:disabled),
+.tool-more:active:not(:disabled) {
+  padding-left: 3px; /* the arrow sits a little right of center, away from the hairline */
+}
+
 .tool-more {
-  background: transparent;
   color: var(--muted);
   opacity: 0.45;
+}
+
+/* Hairline between button and strip; appears at once, no animation. */
+.tool-more::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  margin-left: -11px;
+  width: 1px;
+  background: currentColor;
+  opacity: 0;
+  transition: none;
+}
+
+.tool-group:hover .tool-more::before,
+.tool-group:has(.tool.active) .tool-more::before,
+.tool-more.open::before {
+  opacity: 0.35;
 }
 
 .tool-more svg {
@@ -1499,24 +1561,23 @@ body.light #timeframes {
   transition: transform var(--t-fast) var(--ease-out);
 }
 
-/* The strip shows when the group is hovered, and lights up when the strip itself is. */
-.tool-group:hover .tool-more {
-  opacity: 1;
-  background: var(--hover);
-}
-
-.tool-more:hover:not(:disabled),
+.tool-group:hover .tool-more,
 .tool-more.open {
   opacity: 1;
-  background: var(--border);
+}
+
+.tool-group:has(.tool.active) .tool-more {
+  opacity: 1;
+  color: var(--active-text);
+}
+
+/* The strip itself under the pointer: only its arrow reacts, the box stays one piece. */
+.tool-more:hover:not(:disabled),
+.tool-more.open {
   color: var(--text);
 }
 
+.tool-more:hover:not(:disabled) svg,
 .tool-more.open svg {
   transform: translateX(1px);
-}
-
-/* While its menu is open, the group's button stays lit like on hover. */
-#sidebar .tool-group:has(.tool-more.open) .tool:not(.active) {
-  background: var(--hover);
 }

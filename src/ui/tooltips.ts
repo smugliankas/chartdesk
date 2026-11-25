@@ -41,7 +41,8 @@ export function installTooltips(): void {
   };
 
   const place = (el: HTMLElement) => {
-    const r = el.getBoundingClientRect();
+    // In the left toolbar, a tool group (button + strip) is one box: place beside the whole box.
+    const r = (el.closest('#sidebar') && el.closest('.tool-group')) ? el.closest('.tool-group')!.getBoundingClientRect() : el.getBoundingClientRect();
     const t = tip.getBoundingClientRect();
     const gap = 8;
     let x: number;
