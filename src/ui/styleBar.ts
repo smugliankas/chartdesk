@@ -16,6 +16,8 @@ import {
   type DrawingStyle,
   type LineStyle,
 } from '../drawings/model';
+import { shownOn } from '../drawings/model';
+import { TF_LABELS, TIMEFRAMES, type Timeframe } from '../types';
 import { ICONS } from './tools';
 
 const lineIcon = (width: number, dash = '') =>
@@ -31,6 +33,9 @@ const STYLE_NAMES: Record<LineStyle, string> = { solid: 'Solid', dashed: 'Dashed
 
 const LEVELS_ICON =
   '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h16"/><path d="M17 10l2 2-2 2"/></svg>';
+
+const TIMEFRAMES_ICON =
+  '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg>';
 
 /** Which color the palette is currently picking. */
 type ColorTarget = 'color' | 'profitColor' | 'lossColor';
@@ -185,6 +190,71 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
   trendLabel.append(trendBox, 'Trend line');
   levelsMenu.append(trendLabel);
 
+  // --- timeframes the drawing shows on -----------------------------------------
+  const tfGroup = group();
+  const tfButton = button(tfGroup, TIMEFRAMES_ICON, 'Show on timeframes', () => {
+    const open = !tfMenu.classList.contains('hidden');
+    closePopovers();
+    if (!open) {
+      tfMenu.style.left = `${tfGroup.offsetLeft}px`;
+      tfMenu.classList.remove('hidden');
+    }
+  });
+  const tfMenu = document.createElement('div');
+  tfMenu.className = 'levels-menu tf-menu hidden';
+  bar.append(tfMenu);
+
+  const tfTitle = document.createElement('div');
+  tfTitle.className = 'tf-title';
+  tfTitle.textContent = 'Show on timeframes';
+  const presets = document.createElement('div');
+  presets.className = 'tf-presets';
+  tfMenu.append(tfTitle, presets);
+
+  const setTimeframes = (list: Timeframe[] | undefined) => drawings.setTimeframes(list);
+  const current = (): Timeframe | null => drawings.timeframe;
+  const preset = (label: () => string, pick: (i: number) => Timeframe[] | undefined) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      const tf = current();
+      setTimeframes(tf ? pick(TIMEFRAMES.indexOf(tf)) : undefined);
+    });
+    presets.append(b);
+    return { button: b, label, pick };
+  };
+  const presetButtons = [
+    preset(() => 'All', () => undefined),
+    preset(() => `Only ${TF_LABELS[current() ?? '1h']}`, (i) => [TIMEFRAMES[i]]),
+    preset(() => `${TF_LABELS[current() ?? '1h']} and above`, (i) => TIMEFRAMES.slice(i)),
+    preset(() => `${TF_LABELS[current() ?? '1h']} and below`, (i) => TIMEFRAMES.slice(0, i + 1)),
+  ];
+
+  const tfGrid = document.createElement('div');
+  tfGrid.className = 'tf-grid';
+  tfMenu.append(tfGrid);
+  const tfChecks = new Map<Timeframe, HTMLInputElement>();
+  for (const tf of TIMEFRAMES) {
+    const label = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.addEventListener('change', () => {
+      const d = drawings.selectedDrawing;
+      if (!d) return;
+      const set = new Set(d.timeframes ?? TIMEFRAMES);
+      if (box.checked) set.add(tf);
+      else set.delete(tf);
+      if (set.size === 0) {
+        box.checked = true; // a drawing has to show somewhere
+        return;
+      }
+      setTimeframes(set.size === TIMEFRAMES.length ? undefined : TIMEFRAMES.filter((t) => set.has(t)));
+    });
+    label.append(box, TF_LABELS[tf]);
+    tfGrid.append(label);
+    tfChecks.set(tf, box);
+  }
+
   // --- font size ------------------------------------------------------------
   const fontGroup = group();
   const fontSelect = document.createElement('select');
@@ -212,6 +282,7 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
   function closePopovers(): void {
     palette.classList.add('hidden');
     levelsMenu.classList.add('hidden');
+    tfMenu.classList.add('hidden');
   }
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closePopovers();
@@ -240,8 +311,22 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     lockButton.classList.toggle('active', !!d.locked);
     lockButton.dataset.tip = d.locked ? 'Unlock' : 'Lock (stops it from being moved)';
     lockButton.removeAttribute('title');
-    for (const g of [colorGroup, zoneGroup, widthGroup, lineStyleGroup, fibGroup, fontGroup]) g.classList.toggle('locked', !!d.locked);
+    for (const g of [colorGroup, zoneGroup, widthGroup, lineStyleGroup, fibGroup, tfGroup, fontGroup]) g.classList.toggle('locked', !!d.locked);
     if (!support.fib) levelsMenu.classList.add('hidden');
+
+    const limited = !!d.timeframes;
+    tfButton.classList.toggle('active', limited || !tfMenu.classList.contains('hidden'));
+    tfButton.dataset.tip = limited ? `Shown on ${d.timeframes!.map((t) => TF_LABELS[t]).join(', ')}` : 'Show on timeframes (all)';
+    tfButton.removeAttribute('title');
+    for (const [tf, box] of tfChecks) box.checked = shownOn(d, tf);
+    const tfNow = current();
+    for (const p of presetButtons) {
+      p.button.textContent = p.label();
+      // Light up the preset that matches the drawing's current choice.
+      const list = tfNow ? p.pick(TIMEFRAMES.indexOf(tfNow)) : undefined;
+      const same = list === undefined ? !d.timeframes : !!d.timeframes && list.join() === d.timeframes.join();
+      p.button.classList.toggle('active', same);
+    }
 
     lineColor.swatch.style.background = d.color;
     profitColor.swatch.style.background = currentColor('profitColor');

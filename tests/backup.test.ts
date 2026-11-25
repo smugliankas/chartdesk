@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Drawing } from '../src/drawings/model';
 import { collectBackup, parseBackup, restoreBackup, summarize } from '../src/backup';
 
 /** A minimal in-memory Storage. */
@@ -50,9 +51,17 @@ describe('backup', () => {
       'chartdesk:drawings:binance:BTCUSDT': JSON.stringify([line('old')]),
       'chartdesk:drawings:csv:EURUSD': JSON.stringify([line('keep')]),
     });
-    restoreBackup(parseBackup(text), target);
-    expect(JSON.parse(target.getItem('chartdesk:drawings:binance:BTCUSDT')!)).toEqual([line('a')]);
+    const drawings = restoreBackup(parseBackup(text), target);
+    // Drawings go to the drawing store (IndexedDB), not to localStorage.
+    expect(drawings.get('binance:BTCUSDT')).toEqual([line('a')]);
+    expect(drawings.has('csv:EURUSD')).toBe(false);
     expect(JSON.parse(target.getItem('chartdesk:drawings:csv:EURUSD')!)).toEqual([line('keep')]);
+  });
+
+  it('includes drawings from the drawing store', () => {
+    const backup = collectBackup(memoryStorage({ 'chartdesk:alerts': '[]' }), new Date(), new Map([['binance:ETHUSDT', [line('x') as unknown as Drawing]]]));
+    expect(summarize(backup).drawings).toBe(1);
+    expect(backup.data['chartdesk:drawings:binance:ETHUSDT']).toBe(JSON.stringify([line('x')]));
   });
 
   it('refuses files that are not backups, and never writes foreign keys', () => {

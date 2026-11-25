@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Bar replay: the replay button in the top bar lets you pick a bar; everything after it
+  disappears, and you play the chart forward from there (0.5× to 10× bars per second, Space to
+  play or pause, ⇧→ for one bar). Switching timeframe or symbol keeps the replay's date and
+  shows only bars that had closed by then, so nothing from the future shows. Drawings work as
+  usual; alerts keep watching the live price. The × button goes back to real time.
+- Show a drawing only on some timeframes (clock button in the style bar): presets such as
+  "4H and above" or "Only 15m", or any set of timeframes. The drawings list shows which
+  drawings are not on the current timeframe.
+- Drawings are now stored in the browser's database (IndexedDB) instead of localStorage, which
+  held only about 5 MB (roughly 20,000 drawings) for the whole app. Existing drawings move over
+  on their own the first time.
+- Faster with many drawings: drawings off screen are skipped, saving waits for a pause in
+  quick changes, undo keeps lighter copies, and price labels are only made for lines on screen.
 - ChartDesk now runs on the web with nothing to install:
   https://smugliankas.github.io/chartdesk/ (published by GitHub Actions on every push).
 - Backup: export your drawings, alerts, watchlist and settings to one file from ⚙ Settings,

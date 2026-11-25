@@ -25,7 +25,9 @@ your machine.
   price range, date range, text notes. Grouped in the toolbar like TradingView
 - Drawings list: see every drawing on a symbol; select, hide, lock or delete it
 - Measure tool (`Shift` + click): price change, %, bars and time between two points
-- **No limit on the number of drawings**
+- **No limit on the number of drawings** (stored in the browser's database, tested with tens of thousands)
+- Bar replay: pick a bar and play the chart forward from it, at your speed or bar by bar
+- Show a drawing only on the timeframes you choose (e.g. 4H and above)
 - Drawing styles: color, line width, solid/dashed/dotted lines, text size. Each tool remembers the last style you used
 - Magnet mode: snap points to a bar's open, high, low or close
 - Undo / redo, select, drag (whole drawing or one handle), delete with `Del`
@@ -57,6 +59,8 @@ your machine.
 | `Esc` | Cursor / cancel (in full screen: exits when there is nothing to cancel) |
 | `⇧F` / `Shift` + `F` | Full screen |
 | `⇧A` / `Shift` + `A` | Auto-fit the price scale on / off |
+| `Space` | Replay: play / pause |
+| `⇧→` / `Shift` + `→` | Replay: next bar |
 | `Del` / `Backspace` | Delete selected drawing |
 | `⌘/Ctrl` + `Z`, `⌘/Ctrl` + `Shift` + `Z` | Undo, redo |
 | Double-click a text note | Edit it |

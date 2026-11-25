@@ -135,8 +135,14 @@ button.icon svg {
   gap: 4px;
 }
 
+/* Takes the free space and shortens itself (…) instead of pushing buttons to a new line. */
 #status {
+  flex: 1 1 0;
+  min-width: 0;
   margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -1155,6 +1161,45 @@ body.light #timeframes {
   cursor: pointer;
 }
 
+/* Timeframe visibility: presets on top, then a checkbox per timeframe. */
+.tf-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tf-title {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tf-presets {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.tf-presets button {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.tf-grid {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 6px 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.tf-grid label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
 .levels-menu .levels-trend {
   grid-column: 1 / -1;
   margin-top: 4px;
@@ -1575,4 +1620,104 @@ body.light #timeframes {
 .tool-more:hover:not(:disabled) svg,
 .tool-more.open svg {
   transform: translateX(1px);
+}
+
+/* --- bar replay ---------------------------------------------------------------------- */
+
+#replayBar {
+  position: absolute;
+  bottom: 44px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  animation: pop-in-centered var(--t-med) var(--ease-out);
+  white-space: nowrap;
+}
+
+.rp-button {
+  width: 32px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+}
+
+.rp-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.rp-button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.rp-exit:hover:not(:disabled) {
+  color: var(--loss);
+}
+
+.rp-speed {
+  height: 28px;
+  margin: 0 2px;
+}
+
+.rp-date {
+  padding: 0 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.rp-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 3px;
+  background: var(--border);
+}
+
+/* Picking the start bar: a line on the bar under the mouse, and the bars after it shaded. */
+#replayCursor {
+  position: absolute;
+  top: 0;
+  z-index: 5;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+#replayShade {
+  position: absolute;
+  top: 0;
+  z-index: 5;
+  background: rgba(79, 140, 255, 0.12);
+  pointer-events: none;
+}
+
+#replayHint {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 6px 12px;
+  background: var(--panel);
+  border: 1px solid var(--active-border);
+  border-radius: 8px;
+  font-size: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  animation: pop-in-centered var(--t-med) var(--ease-out);
+}
+
+.replay-picking #chart {
+  cursor: col-resize;
 }

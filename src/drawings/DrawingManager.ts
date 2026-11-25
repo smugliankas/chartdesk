@@ -16,6 +16,7 @@ import {
   isTwoPointType,
   measureText,
   newId,
+  shownOn,
   styleSupport,
   textFont,
   textLineHeight,
@@ -29,6 +30,7 @@ import {
   type TwoPointDrawing,
   type TwoPointType,
 } from './model';
+import type { Timeframe } from '../types';
 import { loadDrawings, loadStyleDefaults, saveDrawings, saveStyleDefaults } from './storage';
 
 interface DragState {
@@ -58,6 +60,8 @@ export class DrawingManager implements DrawingSource {
   editingId: string | null = null;
   measure: { p1: Point; p2: Point } | null = null;
   hidden = false;
+  /** The chart's timeframe, for drawings shown only on some timeframes. */
+  timeframe: Timeframe | null = null;
 
   private tool: ToolId = 'cursor';
   private pending: Point | null = null;
@@ -294,7 +298,7 @@ export class DrawingManager implements DrawingSource {
     copy.locked = false;
     copy.hidden = false;
     if (this.hidden) this.hidden = false;
-    this.mutate(() => this.drawings.push(copy));
+    this.mutate(() => (this.drawings = [...this.drawings, copy]));
     this.selectedId = copy.id;
     this.changed();
   }
@@ -304,6 +308,36 @@ export class DrawingManager implements DrawingSource {
     this.mutate(() => {
       this.drawings = this.drawings.map((d) => (d.id === id ? { ...d, locked: !d.locked } : d));
     });
+  }
+
+  /** Tells the drawings which timeframe the chart shows. */
+  setTimeframe(tf: Timeframe): void {
+    if (this.timeframe === tf) return;
+    this.timeframe = tf;
+    const d = this.selectedDrawing;
+    if (d && !shownOn(d, tf)) this.selectedId = null;
+    this.changed();
+  }
+
+  /** Limits a drawing to some timeframes (`undefined`: all). An empty list is ignored. */
+  setTimeframes(timeframes: Timeframe[] | undefined, id = this.selectedId): void {
+    if (!id || (timeframes && timeframes.length === 0)) return;
+    this.mutate(() => {
+      this.drawings = this.drawings.map((d) => {
+        if (d.id !== id) return d;
+        const next = { ...d };
+        if (timeframes) next.timeframes = [...timeframes];
+        else delete next.timeframes;
+        return next;
+      });
+      const d = this.drawings.find((x) => x.id === id);
+      if (d && this.selectedId === id && !shownOn(d, this.timeframe)) this.selectedId = null;
+    });
+  }
+
+  /** Whether a drawing shows on the chart right now (not hidden, and on this timeframe). */
+  isShown(d: Drawing): boolean {
+    return !this.hidden && !d.hidden && shownOn(d, this.timeframe);
   }
 
   /** Hides or shows one drawing. A hidden drawing can't be selected on the chart. */
@@ -317,7 +351,7 @@ export class DrawingManager implements DrawingSource {
   /** Selects a drawing by id (null to clear the selection). */
   select(id: string | null): void {
     const d = id ? this.drawings.find((x) => x.id === id) : null;
-    if (d?.hidden) return;
+    if (d && (d.hidden || !shownOn(d, this.timeframe))) return;
     if (d && this.tool !== 'cursor') this.setTool('cursor');
     this.selectedId = d ? d.id : null;
     this.changed();
@@ -411,8 +445,9 @@ export class DrawingManager implements DrawingSource {
 
   // --- state helpers --------------------------------------------------------------
 
+  /** Drawings are never changed in place (every change makes new objects), so a shallow copy is a full snapshot. */
   private snapshot(): Drawing[] {
-    return structuredClone(this.drawings);
+    return [...this.drawings];
   }
 
   /** Runs a change to the drawings as one undoable step, then saves. */
@@ -448,7 +483,7 @@ export class DrawingManager implements DrawingSource {
 
   private add(d: Drawing): void {
     if (this.hidden) this.hidden = false;
-    this.mutate(() => this.drawings.push(d));
+    this.mutate(() => (this.drawings = [...this.drawings, d]));
     this.setTool('cursor');
     this.selectedId = d.id;
     this.changed();
@@ -664,7 +699,8 @@ export class DrawingManager implements DrawingSource {
   private hitTest(x: number, y: number): { id: string; part: Part } | null {
     if (this.hidden) return null;
     // Selected drawing first, so its handles win over drawings underneath.
-    const order = this.drawings.filter((d) => !d.hidden).reverse().sort((a, b) => Number(b.id === this.selectedId) - Number(a.id === this.selectedId));
+    const w = this.primitive.viewWindow();
+    const order = this.drawings.filter((d) => !d.hidden && shownOn(d, this.timeframe) && (d.id === this.selectedId || !w || this.primitive.inView(d, w))).reverse().sort((a, b) => Number(b.id === this.selectedId) - Number(a.id === this.selectedId));
     for (const d of order) {
       for (const h of d.locked ? [] : handlesOf(d)) {
         const p = this.xy(h.point);

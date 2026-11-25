@@ -1,5 +1,6 @@
 import type { DrawingManager } from '../drawings/DrawingManager';
-import type { Drawing } from '../drawings/model';
+import { shownOn, type Drawing } from '../drawings/model';
+import { TF_LABELS } from '../types';
 import { ICONS, toolDef } from './tools';
 
 interface Options {
@@ -78,9 +79,16 @@ export function createDrawingsList({ drawings, formatPrice, symbol }: Options): 
       return;
     }
     for (const d of list) {
+      const offTimeframe = !shownOn(d, drawings.timeframe);
       const row = document.createElement('div');
       row.className =
-        'dl-row' + (d.id === drawings.selectedId ? ' current' : '') + (d.hidden ? ' is-hidden' : '') + (d.locked ? ' is-locked' : '');
+        'dl-row' +
+        (d.id === drawings.selectedId ? ' current' : '') +
+        (d.hidden || offTimeframe ? ' is-hidden' : '') +
+        (d.locked ? ' is-locked' : '');
+      if (offTimeframe && drawings.timeframe) {
+        row.dataset.tip = `Not shown on ${TF_LABELS[drawings.timeframe]}. It shows on ${d.timeframes!.map((t) => TF_LABELS[t]).join(', ')}.`;
+      }
       row.addEventListener('click', () => drawings.select(d.id === drawings.selectedId ? null : d.id));
 
       const icon = document.createElement('span');

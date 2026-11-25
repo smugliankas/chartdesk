@@ -107,7 +107,20 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alpha})`;
 }
 
+// Called for every drawing on every frame, so results are kept (there are only a few colors).
+const luminanceCache = new Map<string, number | null>();
+
 function luminance(hex: string): number | null {
+  let l = luminanceCache.get(hex);
+  if (l === undefined) {
+    l = computeLuminance(hex);
+    if (luminanceCache.size > 500) luminanceCache.clear();
+    luminanceCache.set(hex, l);
+  }
+  return l;
+}
+
+function computeLuminance(hex: string): number | null {
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   if (!m) return null;
   const [r, g, b] = [m[1], m[2], m[3]].map((h) => {

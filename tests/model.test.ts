@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIB_LEVELS, fibLevelsOf, fibPrice, fibShowsTrendLine, formatDuration, isStraightLineType, type FibRetracement } from '../src/drawings/model';
+import { FIB_LEVELS, fibLevelsOf, fibPrice, fibShowsTrendLine, formatDuration, isStraightLineType, shownOn, type FibRetracement } from '../src/drawings/model';
 
 const fib = { id: 'f', type: 'fib', p1: { time: 0, price: 100 }, p2: { time: 10, price: 200 } } as FibRetracement;
 
@@ -39,5 +39,14 @@ describe('isStraightLineType', () => {
     expect(['trend', 'ray', 'extended'].every((t) => isStraightLineType(t as 'trend'))).toBe(true);
     expect(isStraightLineType('rect')).toBe(false);
     expect(isStraightLineType('fib')).toBe(false);
+  });
+});
+
+describe('shownOn (timeframe visibility)', () => {
+  it('shows a drawing on every timeframe unless it is limited', () => {
+    expect(shownOn({}, '15m')).toBe(true);
+    expect(shownOn({ timeframes: ['4h', '1d'] }, '4h')).toBe(true);
+    expect(shownOn({ timeframes: ['4h', '1d'] }, '15m')).toBe(false);
+    expect(shownOn({ timeframes: ['4h'] }, null)).toBe(true);
   });
 });

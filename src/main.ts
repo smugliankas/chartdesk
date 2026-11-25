@@ -17,6 +17,8 @@ import { effectiveTextColor, loadAppearance, readable, saveAppearance, type Appe
 import { ChartController } from './chart/ChartController';
 import { BarCountdown } from './chart/countdown';
 import { DrawingManager } from './drawings/DrawingManager';
+import { initDrawingStorage } from './drawings/storage';
+import { Replay, REPLAY_STEP_KEYS } from './replay';
 import type { Drawing, ToolId } from './drawings/model';
 import { csv, getProvider, PROVIDERS, type DataProvider } from './providers';
 import { TF_LABELS, TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from './types';
@@ -109,8 +111,45 @@ cc.candles.attachPrimitive(countdown);
 let liveTimeframe: Timeframe | null = null;
 
 function syncCountdown(): void {
-  countdown.setTimeframe(cc.appearance.countdown ? liveTimeframe : null);
+  // No countdown in a replay: the bar on screen is not the live one.
+  countdown.setTimeframe(cc.appearance.countdown && !replay.active ? liveTimeframe : null);
 }
+
+// --- bar replay ----------------------------------------------------------------------
+
+const replay = new Replay({
+  cc,
+  wrap: chartWrap,
+  timeframe: () => timeframe,
+  onChange: syncReplay,
+  onExit: () => void load(),
+});
+
+const replayButton = $<HTMLButtonElement>('replay');
+replayButton.innerHTML = ICONS.replay;
+replayButton.title = 'Bar replay: pick a bar, then play the chart forward from there';
+replayButton.addEventListener('click', () => {
+  if (replay.isSelecting) replay.cancelSelecting();
+  else replay.startSelecting();
+});
+
+function syncReplay(): void {
+  replayButton.classList.toggle('active', replay.active || replay.isSelecting);
+  syncCountdown();
+  if (!crosshairActive) showLegend(cc.lastCandle);
+  if (replay.active) showReadyStatus();
+  syncControls();
+}
+
+// Shift + → shows the next bar (when no drawing is selected; then the arrows move the drawing).
+window.addEventListener('keydown', (e) => {
+  const target = e.target as HTMLElement | null;
+  if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
+  if (!replay.active || drawings.selectedId || !e.shiftKey || e.key !== 'ArrowRight' || e.metaKey || e.ctrlKey || e.altKey) return;
+  e.preventDefault();
+  replay.pause();
+  replay.step();
+});
 drawings.setMagnet(settings.magnet);
 drawings.setHidden(settings.drawingsHidden);
 
@@ -129,8 +168,8 @@ function applyAppearance(a: Appearance): void {
 }
 
 const settingsDialog = createSettingsDialog(() => cc.appearance, applyAppearance, {
-  onExport: () => {
-    const s = downloadBackup();
+  onExport: async () => {
+    const s = await downloadBackup();
     const n = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
     setStatus(`Backup saved: ${n(s.drawings, 'drawing')} on ${n(s.drawingSymbols.length, 'symbol')}, ${n(s.alerts, 'alert')}.`);
   },
@@ -222,6 +261,11 @@ function setStatus(text: string, isError = false): void {
 }
 
 function showReadyStatus(): void {
+  if (replay.active) {
+    // The date is on the replay bar; the status line only says that this is a replay.
+    setStatus(`${symbol} · ${TF_LABELS[timeframe]} · Replay${replay.atEnd ? ' · end of the data' : ''}`);
+    return;
+  }
   setStatus(`${symbol} · ${TF_LABELS[timeframe]} · ${cc.barCount.toLocaleString()} bars`);
 }
 
@@ -716,12 +760,25 @@ async function load(): Promise<void> {
   if (cc.barCount > 0) chartEl.classList.add('loading');
 
   try {
-    const candles = await provider.getCandles(symbol, timeframe);
+    let candles = await provider.getCandles(symbol, timeframe);
     if (seq !== loadSeq) return; // a newer request has started
     if (candles.length === 0) throw new Error(`No data for ${symbol}.`);
 
-    cc.setData(candles, TF_SECONDS[timeframe]);
+    if (replay.active) {
+      // Keep the replay's date: fetch older bars until it is covered, then show up to it.
+      for (let page = 0; page < 40 && !replay.covers(candles) && provider.getCandlesBefore; page++) {
+        const older = await provider.getCandlesBefore(symbol, timeframe, candles[0].time);
+        if (seq !== loadSeq) return;
+        const add = older.filter((c) => c.time < candles[0].time);
+        if (add.length === 0) break;
+        candles = [...add, ...candles];
+      }
+      replay.resume(candles, TF_SECONDS[timeframe]);
+    } else {
+      cc.setData(candles, TF_SECONDS[timeframe]);
+    }
     drawings.setStorageKey(`${provider.id}:${symbol}`);
+    drawings.setTimeframe(timeframe);
     watchlist.sync();
     showLegend(cc.lastCandle);
     showReadyStatus();
@@ -732,6 +789,11 @@ async function load(): Promise<void> {
       syncCountdown();
       stopLive = provider.subscribe(symbol, timeframe, (c) => {
         if (seq !== loadSeq) return;
+        if (replay.active) {
+          // Alerts keep watching the live price; the chart stays in the past.
+          alerts.observe(provider.id, symbol, c.close);
+          return;
+        }
         cc.update(c);
         alerts.observe(provider.id, symbol, c.close);
         if (!crosshairActive) showLegend(c);
@@ -756,7 +818,9 @@ async function loadOlder(): Promise<void> {
   try {
     const older = await provider.getCandlesBefore(symbol, timeframe, before);
     if (seq !== loadSeq) return;
-    if (cc.prependData(older) === 0) historyDone = true;
+    const added = cc.prependData(older);
+    if (replay.active) replay.prepend(older);
+    if (added === 0) historyDone = true;
     showReadyStatus();
   } catch (err) {
     if (seq === loadSeq) setStatus(errorMessage(err), true);
@@ -859,7 +923,7 @@ window.addEventListener('keydown', (e) => {
 
 /** Whether Esc has something to cancel before it may leave full screen. */
 function escHasWork(): boolean {
-  if (drawings.hasEscapable) return true;
+  if (drawings.hasEscapable || replay.isSelecting) return true;
   const open = document.querySelector(
     '.context-menu, dialog[open], #alertsPanel:not(.hidden), .symbol-list:not(.hidden), .palette:not(.hidden), .levels-menu:not(.hidden)',
   );
@@ -933,6 +997,8 @@ const shortcuts: [string, string][] = [
   [`${MOD}C / ${MOD}V / ${MOD}D`, 'Copy, paste, duplicate drawing'],
   ['Arrow keys', 'Move the selected drawing (Shift: faster)'],
   ['Right-click', 'Drawing and chart menu'],
+  [REPLAY_STEP_KEYS, 'Replay: next bar'],
+  ['Space', 'Replay: play / pause'],
   [SNAPSHOT_DOWNLOAD_KEYS, 'Download chart image'],
   [SNAPSHOT_COPY_KEYS, 'Copy chart image'],
   ['Esc', 'Cursor / cancel; in full screen, exits when there is nothing to cancel'],
@@ -957,5 +1023,8 @@ installTooltips();
 syncProviderUi();
 syncTimeframeUi();
 drawings.setTool('cursor');
-if (provider.freeSymbolInput && symbol) void load();
-else setStatus('Open a CSV file to start.');
+// Drawings are read from the browser's database first, then the chart loads.
+void initDrawingStorage().then(() => {
+  if (provider.freeSymbolInput && symbol) void load();
+  else setStatus('Open a CSV file to start.');
+});

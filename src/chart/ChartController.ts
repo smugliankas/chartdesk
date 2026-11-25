@@ -110,7 +110,11 @@ export class ChartController {
     return this.data[this.data.length - 1];
   }
 
-  setData(candles: Candle[], intervalSeconds: number): void {
+  /**
+   * Replaces all bars. Shows the last 150 bars, or keeps `barsInView` bars on screen
+   * (with the last bar near the right edge) when given.
+   */
+  setData(candles: Candle[], intervalSeconds: number, barsInView?: number): void {
     this.data = candles.slice();
     this.interval = intervalSeconds;
     this.precision = detectPrecision(this.data);
@@ -120,8 +124,25 @@ export class ChartController {
     this.pushToSeries();
 
     const n = this.data.length;
-    if (n > 0) this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 150), to: n + 12 });
-    if (!this.isAutoScale()) this.fitPriceIfOffscreen(Math.max(0, n - 150));
+    const span = Math.max(20, Math.round(barsInView ?? 150));
+    if (n > 0) this.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - span), to: n + 12 });
+    if (!this.isAutoScale()) this.fitPriceIfOffscreen(Math.max(0, n - span));
+  }
+
+  /** Bar size in seconds. */
+  get intervalSeconds(): number {
+    return this.interval;
+  }
+
+  /** A copy of all bars on the chart. */
+  allCandles(): Candle[] {
+    return this.data.slice();
+  }
+
+  /** How many bars are on screen now. */
+  barsInView(): number {
+    const range = this.chart.timeScale().getVisibleLogicalRange();
+    return range ? range.to - range.from : 150;
   }
 
   /**

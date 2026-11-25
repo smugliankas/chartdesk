@@ -3,6 +3,9 @@
  * drawing styles and settings. Exported as one JSON file and restored from it.
  */
 
+import type { Drawing } from './drawings/model';
+import { allDrawings, DRAWINGS_PREFIX, flushDrawings, replaceDrawings } from './drawings/storage';
+
 const PREFIX = 'chartdesk:';
 /** Keys from before the project was named ChartDesk. */
 const OLD_PREFIX = 'chart-app:';
@@ -24,8 +27,15 @@ export interface BackupSummary {
   hasSettings: boolean;
 }
 
-/** Collects the stored data. Works on any Storage, so it can be tested. */
-export function collectBackup(storage: Storage = localStorage, now = new Date()): Backup {
+/**
+ * Collects the stored data: settings and alerts from `storage`, drawings from `drawings`
+ * (kept in IndexedDB). Takes both as arguments, so it can be tested.
+ */
+export function collectBackup(
+  storage: Storage = localStorage,
+  now = new Date(),
+  drawings: ReadonlyMap<string, readonly Drawing[]> = new Map(),
+): Backup {
   const data: Record<string, string> = {};
   for (let i = 0; i < storage.length; i++) {
     const key = storage.key(i);
@@ -38,6 +48,9 @@ export function collectBackup(storage: Storage = localStorage, now = new Date())
       const renamed = PREFIX + key.slice(OLD_PREFIX.length);
       if (storage.getItem(renamed) === null) data[renamed] = value;
     }
+  }
+  for (const [key, list] of drawings) {
+    if (list.length > 0) data[DRAWINGS_PREFIX + key] = JSON.stringify(list);
   }
   return { format: FORMAT, version: 1, exportedAt: now.toISOString(), data };
 }
@@ -82,11 +95,23 @@ export function summarize(backup: Backup): BackupSummary {
 }
 
 /**
- * Writes a backup into storage. Drawings of symbols that are not in the backup are kept;
+ * Writes a backup's settings, alerts and watchlist into `storage` and returns its drawings
+ * by symbol, for the drawing store. Drawings of symbols that are not in the backup are kept;
  * everything in the backup replaces what is there.
  */
-export function restoreBackup(backup: Backup, storage: Storage = localStorage): void {
-  for (const [key, value] of Object.entries(backup.data)) storage.setItem(key, value);
+export function restoreBackup(backup: Backup, storage: Storage = localStorage): Map<string, Drawing[]> {
+  const drawings = new Map<string, Drawing[]>();
+  for (const [key, value] of Object.entries(backup.data)) {
+    if (key.startsWith(DRAWINGS_PREFIX)) {
+      try {
+        const list: unknown = JSON.parse(value);
+        if (Array.isArray(list)) drawings.set(key.slice(DRAWINGS_PREFIX.length), list as Drawing[]);
+      } catch {
+        /* skip a broken entry */
+      }
+    } else storage.setItem(key, value);
+  }
+  return drawings;
 }
 
 function countArray(raw: string): number {
@@ -101,8 +126,9 @@ function countArray(raw: string): number {
 // --- browser side -------------------------------------------------------------
 
 /** Downloads the backup as chartdesk-backup-YYYY-MM-DD.json. */
-export function downloadBackup(): BackupSummary {
-  const backup = collectBackup();
+export async function downloadBackup(): Promise<BackupSummary> {
+  await flushDrawings();
+  const backup = collectBackup(localStorage, new Date(), allDrawings());
   const day = backup.exportedAt.slice(0, 10);
   downloadBlob(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }), `chartdesk-backup-${day}.json`);
   return summarize(backup);
@@ -142,7 +168,7 @@ export function chooseAndRestoreBackup(onError: (message: string) => void): void
           'Drawings on other symbols are kept.',
       );
       if (!ok) return;
-      restoreBackup(backup);
+      await replaceDrawings(restoreBackup(backup));
       location.reload();
     } catch (err) {
       onError(err instanceof Error ? err.message : String(err));

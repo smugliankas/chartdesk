@@ -8,6 +8,7 @@ import type {
 } from 'lightweight-charts';
 import { labelTextColor, readable } from '../chart/appearance';
 import type { ChartController } from '../chart/ChartController';
+import type { Timeframe } from '../types';
 import { extendSegment, handlesOf } from './geometry';
 import {
   DEFAULT_FONT_SIZE,
@@ -20,6 +21,7 @@ import {
   formatDuration,
   formatVolume,
   measureText,
+  shownOn,
   TEXT_PADDING,
   textFont,
   textLineHeight,
@@ -41,9 +43,21 @@ export interface DrawingSource {
   /** All drawings hidden ("hide drawings" toggle). */
   readonly hidden: boolean;
   readonly measure: { p1: Point; p2: Point } | null;
+  /** The chart's timeframe; drawings limited to other timeframes are not shown. */
+  readonly timeframe: Timeframe | null;
 }
 
 const LABEL_FONT = '11px system-ui, -apple-system, Segoe UI, sans-serif';
+
+/** The visible part of the chart in bar indexes and prices, with a margin around it. */
+export interface ViewWindow {
+  from: number;
+  to: number;
+  low: number;
+  high: number;
+}
+
+const overlaps = (a1: number, a2: number, b1: number, b2: number) => Math.max(a1, a2) >= b1 && Math.min(a1, a2) <= b2;
 
 /**
  * A single Lightweight Charts primitive that paints every drawing on top of the candles,
@@ -75,10 +89,15 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
   }
 
   updateAllViews(): void {
-    this.axisViews = (this.source.hidden ? [] : this.source.drawings.filter((d) => !d.hidden))
-      .flatMap((d): { d: Drawing; price: number }[] =>
-        d.type === 'hline' ? [{ d, price: d.price }] : d.type === 'hray' || d.type === 'cross' ? [{ d, price: d.p.price }] : [],
-      )
+    // Labels only for lines inside the visible price range: with thousands of lines,
+    // labels off screen would still cost time on every frame.
+    const pane = this.cc.paneSize();
+    const top = this.cc.yToPrice(0);
+    const bottom = this.cc.yToPrice(pane.height);
+    const lo = top === null || bottom === null ? -Infinity : Math.min(top, bottom);
+    const hi = top === null || bottom === null ? Infinity : Math.max(top, bottom);
+    this.axisViews = this.levelLines()
+      .filter(({ price }) => price >= lo && price <= hi)
       .map(({ d, price }) => {
         const y = this.cc.priceToY(price);
         const text = this.cc.formatPrice(price);
@@ -92,6 +111,29 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       });
   }
 
+  private levelCache: {
+    drawings: readonly Drawing[];
+    hidden: boolean;
+    timeframe: Timeframe | null;
+    lines: { d: Drawing; price: number }[];
+  } | null = null;
+
+  /** Drawings with a price label (horizontal lines and rays, cross lines). Worked out again only when the drawings change. */
+  private levelLines(): { d: Drawing; price: number }[] {
+    const { drawings, hidden, timeframe } = this.source;
+    const c = this.levelCache;
+    if (c && c.drawings === drawings && c.hidden === hidden && c.timeframe === timeframe) return c.lines;
+    const lines = hidden
+      ? []
+      : drawings
+          .filter((d) => !d.hidden && shownOn(d, timeframe))
+          .flatMap((d): { d: Drawing; price: number }[] =>
+            d.type === 'hline' ? [{ d, price: d.price }] : d.type === 'hray' || d.type === 'cross' ? [{ d, price: d.p.price }] : [],
+          );
+    this.levelCache = { drawings, hidden, timeframe, lines };
+    return lines;
+  }
+
   paneViews(): readonly IPrimitivePaneView[] {
     return this.views;
   }
@@ -102,13 +144,93 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
 
   // --- rendering ----------------------------------------------------------
 
+  /**
+   * The visible area plus a margin, or null when it can't be worked out yet.
+   * Drawings entirely outside it are skipped, so thousands of them stay fast.
+   */
+  viewWindow(): ViewWindow | null {
+    const range = this.cc.chart.timeScale().getVisibleLogicalRange();
+    const pane = this.cc.paneSize();
+    const top = this.cc.yToPrice(0);
+    const bottom = this.cc.yToPrice(pane.height);
+    if (!range || top === null || bottom === null) return null;
+    const bars = range.to - range.from;
+    const prices = Math.abs(top - bottom);
+    return {
+      from: range.from - 5 - bars * 0.15,
+      to: range.to + 5 + bars * 0.15,
+      low: Math.min(top, bottom) - prices * 0.15,
+      high: Math.max(top, bottom) + prices * 0.15,
+    };
+  }
+
+  /** Whether any part of the drawing can be on screen. When unsure, says yes. */
+  inView(d: Drawing, w: ViewWindow): boolean {
+    const L = (t: number) => this.cc.timeToLogical(t);
+    const priceIn = (p: number) => p >= w.low && p <= w.high;
+    switch (d.type) {
+      case 'hline':
+        return priceIn(d.price);
+      case 'vline':
+        return L(d.time) >= w.from && L(d.time) <= w.to;
+      case 'hray':
+        return priceIn(d.p.price) && L(d.p.time) <= w.to;
+      case 'cross':
+        return priceIn(d.p.price) || (L(d.p.time) >= w.from && L(d.p.time) <= w.to);
+      case 'ray':
+      case 'extended': {
+        // They reach past their points, so test the line itself against the screen.
+        const a = this.xy(d.p1);
+        const b = this.xy(d.p2);
+        if (!a || !b) return true;
+        const pane = this.cc.paneSize();
+        const reach = (pane.width + pane.height) * 4;
+        const [x1, y1, x2, y2] = extendSegment(a.x, a.y, b.x, b.y, reach, d.type === 'extended');
+        return segmentCrossesRect(x1, y1, x2, y2, -50, -50, pane.width + 50, pane.height + 50);
+      }
+      case 'text':
+        // Extends right and down from its point; only skip it when clearly away.
+        return L(d.p.time) <= w.to && L(d.p.time) >= w.from - (w.to - w.from) && d.p.price >= w.low;
+      case 'long':
+      case 'short':
+        return overlaps(L(d.entry.time), L(d.endTime), w.from, w.to) && overlaps(Math.min(d.tp, d.sl), Math.max(d.tp, d.sl), w.low, w.high);
+      case 'brush': {
+        let t1 = Infinity, t2 = -Infinity, p1 = Infinity, p2 = -Infinity;
+        for (const p of d.points) {
+          t1 = Math.min(t1, p.time);
+          t2 = Math.max(t2, p.time);
+          p1 = Math.min(p1, p.price);
+          p2 = Math.max(p2, p.price);
+        }
+        return overlaps(L(t1), L(t2), w.from, w.to) && overlaps(p1, p2, w.low, w.high);
+      }
+      case 'channel':
+        return (
+          overlaps(L(d.p1.time), L(d.p2.time), w.from, w.to) &&
+          overlaps(
+            Math.min(d.p1.price, d.p2.price, d.p1.price + d.offset, d.p2.price + d.offset),
+            Math.max(d.p1.price, d.p2.price, d.p1.price + d.offset, d.p2.price + d.offset),
+            w.low,
+            w.high,
+          )
+        );
+      default:
+        // Two-point drawings (trend, arrow, rectangle, Fibonacci, ranges): their box.
+        return overlaps(L(d.p1.time), L(d.p2.time), w.from, w.to) && overlaps(d.p1.price, d.p2.price, w.low, w.high);
+    }
+  }
+
   private draw(target: RenderTarget): void {
     target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
-      const { drawings, preview, selectedId, editingId, measure, hidden } = this.source;
+      const { drawings, preview, selectedId, editingId, measure, hidden, timeframe } = this.source;
       const size = { w: mediaSize.width, h: mediaSize.height };
+      const w = this.viewWindow();
       if (!hidden) {
         for (const d of drawings) {
-          if (d.id !== editingId && !d.hidden) this.drawOne(ctx, size, d, d.id === selectedId);
+          if (d.id === editingId || d.hidden || !shownOn(d, timeframe)) continue;
+          const selected = d.id === selectedId;
+          if (!selected && w && !this.inView(d, w)) continue;
+          this.drawOne(ctx, size, d, selected);
         }
       }
       if (preview) this.drawOne(ctx, size, preview, true);
@@ -123,7 +245,8 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
   }
 
   private drawOne(ctx: CanvasRenderingContext2D, size: { w: number; h: number }, d: Drawing, selected: boolean): void {
-    ctx.save();
+    // No ctx.save()/restore() per drawing (slow with thousands of them): every drawing
+    // sets what it uses, and resetState() puts back what some of them change.
     const theme = this.cc.themeColors;
     const color = readable(d.color, theme.background, theme.text);
     ctx.strokeStyle = color;
@@ -310,7 +433,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         if (p) handle(ctx, p.x, p.y, theme.background);
       }
     }
-    ctx.restore();
+    resetState(ctx);
   }
 
   /** Price range: the distance between two prices. Date range: the bars and time between two dates. */
@@ -444,6 +567,41 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
 }
 
 // --- canvas helpers ------------------------------------------------------------------
+
+/** Whether the segment (x1,y1)→(x2,y2) touches the rectangle (Liang–Barsky clipping). */
+function segmentCrossesRect(x1: number, y1: number, x2: number, y2: number, left: number, top: number, right: number, bottom: number): boolean {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  let t0 = 0;
+  let t1 = 1;
+  const edges: [number, number][] = [
+    [-dx, x1 - left],
+    [dx, right - x1],
+    [-dy, y1 - top],
+    [dy, bottom - y1],
+  ];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const r = q / p;
+    if (p < 0) t0 = Math.max(t0, r);
+    else t1 = Math.min(t1, r);
+    if (t0 > t1) return false;
+  }
+  return true;
+}
+
+/** Undoes the state changes a drawing may leave behind. */
+function resetState(ctx: CanvasRenderingContext2D): void {
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'miter';
+  ctx.textAlign = 'start';
+  ctx.textBaseline = 'alphabetic';
+}
 
 function line(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number): void {
   ctx.beginPath();

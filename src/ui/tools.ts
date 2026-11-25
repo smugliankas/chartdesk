@@ -41,6 +41,12 @@ export const ICONS = {
   list: svg('<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>'),
   fullscreen: svg('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
   exitFullscreen: svg('<path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/>'),
+  replay: svg('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/><path d="M10.5 9v6l4.5-3z" fill="currentColor"/>'),
+  replaySelect: svg('<path d="M12 3v18" stroke-dasharray="2 2.5"/><path d="M8 8l-3 4 3 4M16 8l3 4-3 4"/>'),
+  play: svg('<path d="M8 5.5v13l10-6.5z" fill="currentColor"/>'),
+  pause: svg('<path d="M8 5v14M16 5v14" stroke-width="2.6"/>'),
+  stepForward: svg('<path d="M6 5.5v13l9-6.5z" fill="currentColor"/><path d="M18 5v14" stroke-width="2"/>'),
+  close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
   camera: svg('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
   toLatest: svg('<path d="M6 7l5 5-5 5M13 7l5 5-5 5"/>'),
 };

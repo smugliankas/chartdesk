@@ -1,3 +1,4 @@
+import type { Timeframe } from '../types';
 /** A point on the chart in real time (UNIX seconds) and price. */
 export interface Point {
   time: number;
@@ -16,6 +17,8 @@ interface Base {
   locked?: boolean;
   /** Hidden from the chart (shown again from the drawings list). */
   hidden?: boolean;
+  /** Timeframes the drawing is shown on. Missing: all of them. */
+  timeframes?: Timeframe[];
 }
 
 export type TrendLine = Base & { type: 'trend'; p1: Point; p2: Point };
@@ -242,4 +245,9 @@ export function formatVolume(v: number): string {
   if (a >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
   if (a >= 1e4) return `${(v / 1e3).toFixed(1)}K`;
   return `${Math.round(v)}`;
+}
+
+/** Whether a drawing is shown on a timeframe (all timeframes unless limited). */
+export function shownOn(d: { timeframes?: Timeframe[] }, tf: Timeframe | null): boolean {
+  return !tf || !d.timeframes || d.timeframes.includes(tf);
 }
