@@ -1,4 +1,5 @@
 import './style.css';
+import { IS_MAC, modifierHeld } from './platform';
 import type { CandlestickData, Time } from 'lightweight-charts';
 import { AlertManager, alertTarget, type PriceAlert } from './alerts/AlertManager';
 import { AlertsPrimitive } from './alerts/AlertsPrimitive';
@@ -11,7 +12,8 @@ import {
   showToast,
   unlockAudioOnFirstInteraction,
 } from './alerts/notify';
-import { effectiveTextColor, loadAppearance, saveAppearance, type Appearance } from './chart/appearance';
+import { chooseAndRestoreBackup, downloadBackup, downloadBlob } from './backup';
+import { effectiveTextColor, loadAppearance, readable, saveAppearance, type Appearance } from './chart/appearance';
 import { ChartController } from './chart/ChartController';
 import { BarCountdown } from './chart/countdown';
 import { DrawingManager } from './drawings/DrawingManager';
@@ -23,6 +25,7 @@ import { showContextMenu, type MenuEntry } from './ui/contextMenu';
 import { createSettingsDialog } from './ui/settingsDialog';
 import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
+import { canvasToBlob, copyImage, renderSnapshot, snapshotFileName } from './ui/snapshot';
 import { createWatchlist } from './ui/watchlist';
 import { installTooltips } from './ui/tooltips';
 import { ALT, HOLD, ICONS, MOD, TOOLBAR, toolTitle } from './ui/tools';
@@ -120,7 +123,14 @@ function applyAppearance(a: Appearance): void {
   syncCountdown();
 }
 
-const settingsDialog = createSettingsDialog(() => cc.appearance, applyAppearance);
+const settingsDialog = createSettingsDialog(() => cc.appearance, applyAppearance, {
+  onExport: () => {
+    const s = downloadBackup();
+    const n = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
+    setStatus(`Backup saved: ${n(s.drawings, 'drawing')} on ${n(s.drawingSymbols.length, 'symbol')}, ${n(s.alerts, 'alert')}.`);
+  },
+  onImport: () => chooseAndRestoreBackup((message) => setStatus(message, true)),
+});
 applyAppearance(loadAppearance());
 
 // --- top bar ---------------------------------------------------------------------
@@ -674,6 +684,69 @@ function showLegend(c: Candle | undefined): void {
   legendEl.querySelector('b')!.textContent = `${symbol} · ${TF_LABELS[timeframe]}`;
 }
 
+// --- chart image ---------------------------------------------------------------------
+
+const SNAPSHOT_DOWNLOAD_KEYS = IS_MAC ? '⌥⌘S' : 'Ctrl+Alt+S';
+const SNAPSHOT_COPY_KEYS = IS_MAC ? '⇧⌘S' : 'Ctrl+Shift+S';
+
+function makeSnapshot(): HTMLCanvasElement {
+  const a = cc.appearance;
+  const text = effectiveTextColor(a);
+  return drawings.whileUnselected(() =>
+    renderSnapshot(cc.chart, {
+      title: `${symbol} · ${TF_LABELS[timeframe]} · ${provider.name.replace(/\s*\(.*\)$/, '')}`,
+      candle: cc.lastCandle,
+      formatPrice: (p) => cc.formatPrice(p),
+      background: a.background,
+      text,
+      up: readable(a.upColor, a.background, text),
+      down: readable(a.downColor, a.background, text),
+    }),
+  );
+}
+
+async function downloadSnapshot(): Promise<void> {
+  if (cc.barCount === 0) return;
+  try {
+    const blob = await canvasToBlob(makeSnapshot());
+    downloadBlob(blob, snapshotFileName(symbol, TF_LABELS[timeframe]));
+    setStatus('Chart image saved.');
+  } catch (err) {
+    setStatus(errorMessage(err), true);
+  }
+}
+
+async function copySnapshot(): Promise<void> {
+  if (cc.barCount === 0) return;
+  try {
+    await copyImage(canvasToBlob(makeSnapshot()));
+    setStatus('Chart image copied. Paste it anywhere.');
+  } catch (err) {
+    setStatus(errorMessage(err), true);
+  }
+}
+
+const snapshotButton = $<HTMLButtonElement>('snapshot');
+snapshotButton.innerHTML = ICONS.camera;
+snapshotButton.addEventListener('click', () => {
+  const r = snapshotButton.getBoundingClientRect();
+  showContextMenu(r.left, r.bottom + 4, [
+    { label: 'Download image', shortcut: SNAPSHOT_DOWNLOAD_KEYS, disabled: cc.barCount === 0, action: () => void downloadSnapshot() },
+    { label: 'Copy image', shortcut: SNAPSHOT_COPY_KEYS, disabled: cc.barCount === 0, action: () => void copySnapshot() },
+  ]);
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'KeyS' || !modifierHeld(e)) return;
+  if (e.altKey && !e.shiftKey) {
+    e.preventDefault();
+    void downloadSnapshot();
+  } else if (e.shiftKey && !e.altKey) {
+    e.preventDefault();
+    void copySnapshot();
+  }
+});
+
 // --- About dialog ------------------------------------------------------------------
 
 const aboutDialog = $<HTMLDialogElement>('aboutDialog');
@@ -708,6 +781,8 @@ const shortcuts: [string, string][] = [
   [`${MOD}C / ${MOD}V / ${MOD}D`, 'Copy, paste, duplicate drawing'],
   ['Arrow keys', 'Move the selected drawing (Shift: faster)'],
   ['Right-click', 'Drawing and chart menu'],
+  [SNAPSHOT_DOWNLOAD_KEYS, 'Download chart image'],
+  [SNAPSHOT_COPY_KEYS, 'Copy chart image'],
   ['Esc', 'Cursor / cancel'],
   ['Del', 'Delete selected drawing'],
   [`${MOD}Z`, 'Undo'],

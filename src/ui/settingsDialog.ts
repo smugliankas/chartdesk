@@ -7,12 +7,13 @@ import { defaultAppearance, FONT_SIZES, withTheme, type Appearance, type Theme }
 export function createSettingsDialog(
   get: () => Appearance,
   onChange: (a: Appearance) => void,
+  backup: { onExport: () => void; onImport: () => void },
 ): { open: () => void; sync: () => void } {
   const dialog = document.createElement('dialog');
   dialog.id = 'settingsDialog';
   dialog.innerHTML = `
     <form method="dialog">
-      <h2>Chart settings</h2>
+      <h2>Settings</h2>
 
       <h3>Theme</h3>
       <div class="segmented" data-field="theme">
@@ -64,6 +65,13 @@ export function createSettingsDialog(
         <label><input type="checkbox" data-field="showVolume" /> Show volume</label>
       </div>
 
+      <h3>Backup</h3>
+      <div class="settings-row">
+        <button type="button" id="backupExport">Export backup…</button>
+        <button type="button" id="backupImport">Restore from file…</button>
+      </div>
+      <p class="hint">Drawings, alerts, watchlist and settings are kept only in this browser. Export a backup now and then, or to move to another computer.</p>
+
       <div class="dialog-actions spread">
         <button type="button" id="settingsReset">Reset to defaults</button>
         <button value="close">Done</button>
@@ -114,6 +122,8 @@ export function createSettingsDialog(
     onChange(defaultAppearance(get().theme));
     sync();
   });
+  dialog.querySelector('#backupExport')!.addEventListener('click', () => backup.onExport());
+  dialog.querySelector('#backupImport')!.addEventListener('click', () => backup.onImport());
   dialog.addEventListener('click', (e) => {
     if (e.target === dialog) dialog.close(); // click on the backdrop
   });

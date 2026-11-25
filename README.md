@@ -5,6 +5,8 @@
 > A free, open-source charting app with **unlimited drawings**.
 > Runs on your own computer, and you bring your own data.
 
+**[Open ChartDesk in your browser →](https://smugliankas.github.io/chartdesk/)** Nothing to install.
+
 Tired of drawing limits, indicator caps and paywalls on your charting platform? This app
 gives you candlestick charts and drawing tools with no limits, and your drawings stay on
 your machine.
@@ -26,6 +28,8 @@ your machine.
 - Magnet mode: snap points to a bar's open, high, low or close
 - Undo / redo, select, drag (whole drawing or one handle), delete with `Del`
 - Right-click menu, copy / paste / duplicate, lock drawings, hide all drawings
+- Chart image: download as PNG or copy to paste anywhere
+- Backup and restore of drawings, alerts, watchlist and settings
 - Nudge with the arrow keys; `Shift` keeps lines horizontal, vertical or at 45°
 - Drawings are saved per symbol and stay in place when you switch timeframes
 - Log scale, auto-fit and "scroll to latest bar" controls; show/hide volume
@@ -45,6 +49,8 @@ your machine.
 | `⌘/Ctrl` + `C` / `V` / `D` | Copy, paste, duplicate the selected drawing |
 | Arrow keys (`Shift` for ×10) | Move the selected drawing |
 | Right-click | Drawing or chart menu |
+| `⌥⌘S` / `Ctrl` + `Alt` + `S` | Download chart image |
+| `⇧⌘S` / `Ctrl` + `Shift` + `S` | Copy chart image |
 | `Esc` | Cursor / cancel |
 | `Del` / `Backspace` | Delete selected drawing |
 | `⌘/Ctrl` + `Z`, `⌘/Ctrl` + `Shift` + `Z` | Undo, redo |
@@ -70,7 +76,11 @@ Other CSVs work too if the first row is a header with a date/time column plus
 
 ## Quick start
 
-Requires [Node.js](https://nodejs.org) 20 or newer.
+The easiest way is the hosted version: **https://smugliankas.github.io/chartdesk/**. It runs
+entirely in your browser; market data comes straight from the source to you, and your drawings
+are saved in your browser (export a backup from ⚙ Settings now and then).
+
+To run it from the source code instead (requires [Node.js](https://nodejs.org) 20 or newer):
 
 ```bash
 npm install

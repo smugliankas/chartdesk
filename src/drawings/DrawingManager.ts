@@ -227,6 +227,20 @@ export class DrawingManager implements DrawingSource {
     this.changed();
   }
 
+  /** Runs `fn` with nothing shown as selected and no measurement, e.g. for a chart image. */
+  whileUnselected<T>(fn: () => T): T {
+    const selected = this.selectedId;
+    const measure = this.measure;
+    this.selectedId = null;
+    this.measure = null;
+    try {
+      return fn();
+    } finally {
+      this.selectedId = selected;
+      this.measure = measure;
+    }
+  }
+
   /** Hides or shows all drawings (they stay saved). */
   setHidden(hidden: boolean): void {
     this.hidden = hidden;

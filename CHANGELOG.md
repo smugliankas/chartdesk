@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- ChartDesk now runs on the web with nothing to install:
+  https://smugliankas.github.io/chartdesk/ (published by GitHub Actions on every push).
+- Backup: export your drawings, alerts, watchlist and settings to one file from ⚙ Settings,
+  and restore them from it (also to move to another computer or browser).
+- Chart image: the camera button downloads the chart as a PNG (⌥⌘S / Ctrl+Alt+S) or copies
+  it to paste anywhere (⇧⌘S / Ctrl+Shift+S). The image has a header with the symbol,
+  timeframe and last bar, and leaves out the selection handles.
+- Icon for the browser tab, and a description for link previews.
 - Watchlist: a panel on the right (list button in the top bar) with live price and 24h change
   for your symbols. Click a row to open it on the chart; add symbols with the search box,
   remove them with ×. Prices use each market's own decimals and flash green or red when they
