@@ -86,6 +86,11 @@ export class DrawingManager implements DrawingSource {
 
   // --- public API ---------------------------------------------------------------
 
+  /** Storage key of the drawings on screen ("provider:symbol"). */
+  get currentKey(): string {
+    return this.storageKey;
+  }
+
   get currentTool(): ToolId {
     return this.tool;
   }

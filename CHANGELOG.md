@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Price alerts: get a sound, a desktop notification and an on-screen message when the price
+  crosses a level. Set one from the bell menu, with the bell that follows the cursor next to
+  the price scale, with ⌥/Alt + A at the cursor price, or on a selected horizontal line, trend
+  line, ray or extended line (the alert follows the line, also when it is moved). Alerts are
+  watched for every symbol, not only the one on the chart, while ChartDesk is open. Fired
+  alerts can be turned on again or cleared. Hover an alert line to see its price and a ×
+  to delete it; drag the line to move the alert. Alerts use the chart's text color.
+
 ## v0.2.0
 
 Customization, chart settings and a few TradingView favorites.

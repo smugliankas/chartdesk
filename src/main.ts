@@ -1,12 +1,24 @@
 import './style.css';
 import type { CandlestickData, Time } from 'lightweight-charts';
+import { AlertManager, alertTarget, type PriceAlert } from './alerts/AlertManager';
+import { AlertsPrimitive } from './alerts/AlertsPrimitive';
+import { attachAlertInteraction } from './alerts/alertInteraction';
+import {
+  flashTitle,
+  playAlertSound,
+  requestNotificationPermission,
+  showBrowserNotification,
+  showToast,
+  unlockAudioOnFirstInteraction,
+} from './alerts/notify';
 import { effectiveTextColor, loadAppearance, saveAppearance, type Appearance } from './chart/appearance';
 import { ChartController } from './chart/ChartController';
 import { BarCountdown } from './chart/countdown';
 import { DrawingManager } from './drawings/DrawingManager';
-import type { ToolId } from './drawings/model';
+import type { Drawing, ToolId } from './drawings/model';
 import { csv, getProvider, PROVIDERS, type DataProvider } from './providers';
 import { TF_LABELS, TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from './types';
+import { createAlertsPanel } from './ui/alertsPanel';
 import { createSettingsDialog } from './ui/settingsDialog';
 import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
@@ -240,12 +252,178 @@ const clearButton = sidebarButton(ICONS.trashAll, 'Remove all drawings on this s
 });
 clearButton.classList.add('danger');
 
-const syncStyleBar = createStyleBar(chartWrap, drawings);
+// --- alerts -------------------------------------------------------------------------
+
+const alerts = new AlertManager();
+const alertsPrimitive = new AlertsPrimitive(cc, () => alerts.forSymbol(provider.id, symbol));
+cc.candles.attachPrimitive(alertsPrimitive);
+unlockAudioOnFirstInteraction();
+
+/** Price under the mouse on the chart, for ⌥A. */
+let crosshairPrice: number | null = null;
+
+function canAlert(): boolean {
+  if (provider.subscribe) return true;
+  setStatus('Alerts need live data, e.g. Binance.', true);
+  return false;
+}
+
+/** Alert at a fixed price. */
+function addAlertAt(price: number, drawingId?: string): void {
+  if (!canAlert()) return;
+  alerts.add({ providerId: provider.id, symbol, price, priceText: cc.formatPrice(price), currentPrice: cc.lastCandle?.close, drawingId });
+  void requestNotificationPermission();
+  setStatus(`Alert set: ${symbol} crossing ${cc.formatPrice(price)}`);
+}
+
+const ALERTABLE: readonly Drawing['type'][] = ['hline', 'trend', 'ray', 'extended'];
+
+/** Alert on a drawing: a fixed level for a horizontal line, a moving level for a sloped line. */
+function addDrawingAlert(d: Drawing): void {
+  if (!canAlert()) return;
+  if (d.type === 'hline') return addAlertAt(d.price, d.id);
+  if (d.type !== 'trend' && d.type !== 'ray' && d.type !== 'extended') return;
+  const line = { kind: d.type, p1: d.p1, p2: d.p2 };
+  const a = alerts.add({
+    providerId: provider.id,
+    symbol,
+    price: d.p2.price,
+    priceText: cc.formatPrice(d.p2.price),
+    currentPrice: cc.lastCandle?.close,
+    drawingId: d.id,
+    line,
+  });
+  void requestNotificationPermission();
+  setStatus(`Alert set: ${symbol} crossing the ${alertTarget(a)}`);
+}
+
+function selectAlertSymbol(a: PriceAlert): void {
+  if (a.providerId !== provider.id) {
+    provider = getProvider(a.providerId);
+    settings.provider = provider.id;
+  }
+  symbol = a.symbol;
+  if (provider.freeSymbolInput) settings.symbols[provider.id] = symbol;
+  saveSettings();
+  syncProviderUi();
+  void load();
+}
+
+const alertsPanel = createAlertsPanel({
+  button: $<HTMLButtonElement>('alerts'),
+  manager: alerts,
+  context: () => ({ canAlert: !!provider.subscribe && cc.barCount > 0, price: cc.lastCandle?.close, format: (p) => cc.formatPrice(p) }),
+  onAdd: (price) => addAlertAt(price),
+  onSelect: selectAlertSymbol,
+});
+
+alerts.onTrigger((a, price) => {
+  const decimals = a.priceText.split('.')[1]?.length ?? 2;
+  const title = `${a.symbol} crossed ${a.line ? 'the ' : ''}${alertTarget(a)}`;
+  const body = `Price is now ${price.toFixed(decimals)}`;
+  playAlertSound();
+  showToast(title, body);
+  showBrowserNotification(title, body);
+  flashTitle(title);
+});
+
+/** Keeps alerts that sit on a drawing in step with it (moved or deleted). */
+function syncLineAlerts(): void {
+  for (const a of [...alerts.all]) {
+    if (!a.drawingId || `${a.providerId}:${a.symbol}` !== drawings.currentKey) continue;
+    const d = drawings.drawings.find((x) => x.id === a.drawingId);
+    if (!d || !ALERTABLE.includes(d.type)) {
+      alerts.remove(a.id);
+    } else if (d.type === 'hline') {
+      if (d.price !== a.price) alerts.update(a.id, { price: d.price, priceText: cc.formatPrice(d.price) });
+    } else if (d.type === 'trend' || d.type === 'ray' || d.type === 'extended') {
+      const l = a.line;
+      const moved = !l || l.p1.time !== d.p1.time || l.p1.price !== d.p1.price || l.p2.time !== d.p2.time || l.p2.price !== d.p2.price;
+      if (moved) {
+        alerts.update(a.id, {
+          price: d.p2.price,
+          priceText: cc.formatPrice(d.p2.price),
+          line: { kind: d.type, p1: d.p1, p2: d.p2 },
+        });
+      }
+    }
+  }
+}
+
+const syncStyleBar = createStyleBar(chartWrap, drawings, {
+  supports: (d) => ALERTABLE.includes(d.type),
+  has: (id) => alerts.all.some((a) => a.drawingId === id && !a.triggeredAt),
+  toggle: (d) => {
+    const existing = alerts.all.filter((a) => a.drawingId === d.id);
+    const hadActive = existing.some((a) => !a.triggeredAt);
+    existing.forEach((a) => alerts.remove(a.id));
+    if (!hadActive) addDrawingAlert(d);
+  },
+});
+
+// Bell next to the price scale, following the cursor: click to add an alert at that price.
+const priceAlertButton = $<HTMLButtonElement>('priceAlertButton');
+priceAlertButton.innerHTML = ICONS.bell;
+let priceAlertPrice: number | null = null;
+let priceAlertHover = false;
+let priceAlertHideTimer: ReturnType<typeof setTimeout> | undefined;
+
+function hidePriceAlertButtonSoon(): void {
+  clearTimeout(priceAlertHideTimer);
+  priceAlertHideTimer = setTimeout(() => {
+    if (!priceAlertHover) priceAlertButton.classList.add('hidden');
+  }, 400);
+}
+
+function placePriceAlertButton(y: number | null): void {
+  const price = y === null ? null : cc.yToPrice(y);
+  if (y === null || price === null || !provider.subscribe || drawings.currentTool !== 'cursor' || hoveringAlertLine) {
+    hidePriceAlertButtonSoon();
+    return;
+  }
+  clearTimeout(priceAlertHideTimer);
+  priceAlertPrice = price;
+  priceAlertButton.style.top = `${Math.round(y) - 11}px`;
+  priceAlertButton.style.right = `${cc.priceScaleWidth() + 4}px`;
+  priceAlertButton.title = `Add alert at ${cc.formatPrice(price)}`;
+  priceAlertButton.classList.remove('hidden');
+}
+
+priceAlertButton.addEventListener('mouseenter', () => (priceAlertHover = true));
+priceAlertButton.addEventListener('mouseleave', () => {
+  priceAlertHover = false;
+  hidePriceAlertButtonSoon();
+});
+priceAlertButton.addEventListener('click', () => {
+  if (priceAlertPrice !== null) addAlertAt(priceAlertPrice);
+});
+
+// Hover an alert line for its price and a × to delete it; drag it to move the alert.
+let hoveringAlertLine = false;
+attachAlertInteraction({
+  host: chartWrap,
+  chartEl,
+  cc,
+  manager: alerts,
+  primitive: alertsPrimitive,
+  isCursor: () => drawings.currentTool === 'cursor',
+  onHoverChange: (h) => {
+    hoveringAlertLine = h;
+    if (h) priceAlertButton.classList.add('hidden');
+  },
+});
+
+alerts.onChange(() => {
+  alertsPrimitive.requestUpdate();
+  alertsPanel.sync();
+  syncStyleBar();
+});
 
 drawings.onToolChange((tool) => {
   for (const [id, b] of toolButtons) b.classList.toggle('active', id === tool);
 });
 drawings.onChange(() => {
+  syncLineAlerts();
   syncStyleBar();
   undoButton.disabled = !drawings.canUndo;
   redoButton.disabled = !drawings.canRedo;
@@ -259,6 +437,12 @@ window.addEventListener('keydown', (e) => {
   const target = e.target as HTMLElement | null;
   if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
   if (!e.altKey || e.metaKey || e.ctrlKey) return;
+  if (e.code === 'KeyA') {
+    e.preventDefault();
+    const price = crosshairPrice ?? cc.lastCandle?.close;
+    if (price !== undefined) addAlertAt(price);
+    return;
+  }
   const t = TOOLBAR.find((d) => d?.key === e.code);
   if (t) {
     e.preventDefault();
@@ -332,6 +516,7 @@ async function load(): Promise<void> {
       stopLive = provider.subscribe(symbol, timeframe, (c) => {
         if (seq !== loadSeq) return;
         cc.update(c);
+        alerts.observe(provider.id, symbol, c.close);
         if (!crosshairActive) showLegend(c);
       });
     }
@@ -366,6 +551,8 @@ let crosshairActive = false;
 cc.chart.subscribeCrosshairMove((param) => {
   const bar = param.seriesData.get(cc.candles) as CandlestickData<Time> | undefined;
   crosshairActive = !!bar;
+  crosshairPrice = param.point ? cc.yToPrice(param.point.y) : null;
+  placePriceAlertButton(param.point ? param.point.y : null);
   showLegend(bar ? { time: bar.time as number, open: bar.open, high: bar.high, low: bar.low, close: bar.close } : cc.lastCandle);
 });
 
@@ -400,6 +587,7 @@ aboutDialog.addEventListener('click', (e) => {
 const shortcuts: [string, string][] = [
   ...TOOLBAR.filter((t) => t?.key).map((t) => [`${ALT}${t!.key!.replace('Key', '')}`, t!.title] as [string, string]),
   ['Shift + click', 'Measure'],
+  [`${ALT}A`, 'Alert at the cursor price'],
   ['Esc', 'Cursor / cancel'],
   ['Del', 'Delete selected drawing'],
   [`${MOD}Z`, 'Undo'],

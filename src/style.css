@@ -583,3 +583,259 @@ dialog .hint {
   opacity: 0.3;
   cursor: default;
 }
+
+/* --- Alerts ----------------------------------------------------------------------- */
+
+.alerts-box {
+  position: relative;
+}
+
+#alerts {
+  position: relative;
+}
+
+#alerts .badge {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+
+#alertsPanel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  width: 320px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+#alertsPanel h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+#alertsPanel p {
+  margin: 6px 0;
+}
+
+#alertsPanel .small {
+  font-size: 12px;
+}
+
+.alert-add {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.alert-add input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+button.link {
+  height: auto;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+}
+
+button.link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.alert-list {
+  margin: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.alert-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.alert-row.triggered {
+  opacity: 0.6;
+}
+
+.alert-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.alert-info span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.alert-status {
+  font-size: 12px;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.alert-row.triggered .alert-status {
+  color: var(--muted);
+}
+
+.alert-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.alert-actions button {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+}
+
+.alert-actions button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+#toasts {
+  position: fixed;
+  bottom: 48px;
+  left: 62px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 260px;
+  padding: 12px 12px 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  animation: toast-in 0.2s ease-out;
+}
+
+.toast > div {
+  flex: 1;
+}
+
+.toast strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.toast button {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  color: var(--muted);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Bell next to the price scale that follows the cursor. */
+.price-alert {
+  position: absolute;
+  z-index: 4;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.price-alert svg {
+  width: 14px;
+  height: 14px;
+}
+
+.price-alert:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Label shown when hovering an alert line: price and a delete button. */
+.alert-tag {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 2px 0 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.alert-tag-icon svg {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+
+.alert-tag-remove {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.alert-tag-remove:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--down);
+}

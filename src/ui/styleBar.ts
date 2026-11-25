@@ -1,4 +1,5 @@
 import type { DrawingManager } from '../drawings/DrawingManager';
+import type { Drawing } from '../drawings/model';
 import {
   DEFAULT_FONT_SIZE,
   DEFAULT_WIDTH,
@@ -27,7 +28,16 @@ const STYLE_NAMES: Record<LineStyle, string> = { solid: 'Solid', dashed: 'Dashed
  * color, line width, line style, font size and delete.
  * Returns a function that refreshes it; call it whenever the drawings change.
  */
-export function createStyleBar(host: HTMLElement, drawings: DrawingManager): () => void {
+export interface LineAlertHooks {
+  /** Whether alerts can be set on this kind of drawing. */
+  supports: (d: Drawing) => boolean;
+  /** Whether this drawing already has an active alert. */
+  has: (drawingId: string) => boolean;
+  /** Adds or removes the alert on this drawing. */
+  toggle: (d: Drawing) => void;
+}
+
+export function createStyleBar(host: HTMLElement, drawings: DrawingManager, alerts?: LineAlertHooks): () => void {
   const bar = document.createElement('div');
   bar.id = 'styleBar';
   bar.className = 'hidden';
@@ -105,6 +115,13 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager): () 
   fontGroup.append(fontSelect);
 
   // --- delete -----------------------------------------------------------------
+  // --- alert (horizontal and sloped lines) --------------------------------------
+  const alertGroup = group();
+  const alertButton = button(alertGroup, ICONS.bell, 'Alert when price crosses this line', () => {
+    const d = drawings.selectedDrawing;
+    if (d && alerts) alerts.toggle(d);
+  });
+
   const deleteGroup = group();
   button(deleteGroup, ICONS.trash, 'Delete (Del)', () => drawings.deleteSelected()).classList.add('danger');
 
@@ -120,6 +137,8 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager): () 
     widthGroup.classList.toggle('hidden', !support.line);
     lineStyleGroup.classList.toggle('hidden', !support.line);
     fontGroup.classList.toggle('hidden', !support.font);
+    alertGroup.classList.toggle('hidden', !alerts?.supports(d));
+    alertButton.classList.toggle('active', !!alerts?.has(d.id));
 
     swatch.style.background = d.color;
     if (/^#[0-9a-f]{6}$/i.test(d.color)) picker.value = d.color;

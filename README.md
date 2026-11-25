@@ -12,6 +12,8 @@ your machine.
 - Candlestick chart with volume; timeframes 1m, 5m, 15m, 30m, 1H, 4H, 1D, 1W and 1M
 - Older history loads automatically as you scroll left
 - Symbol search (Binance), live updates for crypto
+- Price alerts with sound, desktop notification and on-screen message; set from the bell menu,
+  the bell next to the price scale, `Alt/⌥` + `A`, or on a horizontal or sloped line. Watched for all symbols while ChartDesk is open
 - Countdown to bar close in the last-price label (can be turned off in the settings)
 - Drawing tools: trend line, ray, extended line, horizontal and vertical lines, rectangle,
   Fibonacci retracement, long/short position, text notes
@@ -31,6 +33,7 @@ your machine.
 | Keys | Action |
 | --- | --- |
 | `Alt/⌥` + `T` `H` `V` `R` `F` `L` `S` `N` `M` | Trend line, horizontal line, vertical line, rectangle, Fibonacci, long, short, text, measure |
+| `Alt/⌥` + `A` | Alert at the cursor price |
 | `Shift` + click | Measure |
 | `Esc` | Cursor / cancel |
 | `Del` / `Backspace` | Delete selected drawing |
