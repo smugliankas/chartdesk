@@ -13,6 +13,8 @@ export interface Quote {
 /** One entry in the symbol search list. */
 export interface SymbolInfo {
   symbol: string;
+  /** Plain name, e.g. "Gold" or "Apple", shown after the symbol. */
+  name?: string;
   /** Short extra text shown next to the symbol (e.g. 24h change). */
   detail?: string;
 }
@@ -30,8 +32,12 @@ export interface DataProvider {
   readonly id: string;
   /** Name shown in the UI. */
   readonly name: string;
+  /** One or two sentences about the data, shown as a tooltip on the source. */
+  readonly description?: string;
   /** Whether the user types a symbol (true) or the provider supplies it (e.g. a loaded file). */
   readonly freeSymbolInput: boolean;
+  /** Symbol opened the first time this source is picked. */
+  readonly defaultSymbol?: string;
 
   /** The most recent candles, oldest first. */
   getCandles(symbol: string, tf: Timeframe): Promise<Candle[]>;

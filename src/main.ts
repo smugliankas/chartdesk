@@ -98,7 +98,7 @@ const settings = loadSettings();
 // --- state -------------------------------------------------------------------
 
 let provider: DataProvider = getProvider(settings.provider);
-let symbol = provider.freeSymbolInput ? (settings.symbols[provider.id] ?? '') : '';
+let symbol = provider.freeSymbolInput ? (settings.symbols[provider.id] ?? provider.defaultSymbol ?? '') : '';
 let timeframe: Timeframe = TIMEFRAMES.includes(settings.timeframe) ? settings.timeframe : '1h';
 let stopLive: (() => void) | null = null;
 let loadSeq = 0;
@@ -181,7 +181,11 @@ applyAppearance(loadAppearance());
 
 // --- top bar ---------------------------------------------------------------------
 
-for (const p of PROVIDERS) providerSelect.append(new Option(p.name, p.id));
+for (const p of PROVIDERS) {
+  const option = new Option(p.name, p.id);
+  if (p.description) option.title = p.description;
+  providerSelect.append(option);
+}
 
 const tfButtons = new Map<Timeframe, HTMLButtonElement>();
 for (const tf of TIMEFRAMES) {
@@ -208,7 +212,7 @@ providerSelect.addEventListener('change', () => {
   provider = getProvider(providerSelect.value);
   settings.provider = provider.id;
   saveSettings();
-  symbol = provider.freeSymbolInput ? (settings.symbols[provider.id] ?? '') : '';
+  symbol = provider.freeSymbolInput ? (settings.symbols[provider.id] ?? provider.defaultSymbol ?? '') : '';
   syncProviderUi();
   if (provider.freeSymbolInput && symbol) void load();
   else if (!provider.freeSymbolInput) {
@@ -251,6 +255,7 @@ function syncProviderUi(): void {
   symbolInput.value = symbol;
   symbolInput.disabled = !provider.freeSymbolInput;
   csvButton.classList.toggle('hidden', provider.id !== csv.id);
+  providerSelect.title = provider.description ?? 'Data source';
 }
 
 function syncTimeframeUi(): void {
@@ -971,6 +976,7 @@ const drawingsListButton = $<HTMLButtonElement>('drawingsToggle');
 drawingsListButton.innerHTML = ICONS.layers;
 const watchlist = createWatchlist({
   providerId: 'binance',
+  addProvider: () => (provider.searchSymbols && provider.watchQuotes ? provider : getProvider('binance')),
   current: () => ({ providerId: provider.id, symbol }),
   onSelect: (item) => selectSymbol(item.providerId, item.symbol),
 });

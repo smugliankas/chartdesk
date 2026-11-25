@@ -29,7 +29,13 @@ export function attachSymbolSearch(input: HTMLInputElement, { search, onPick }: 
         const row = document.createElement('div');
         row.className = 'symbol-item' + (i === active ? ' active' : '');
         const name = document.createElement('span');
+        name.className = 'symbol-name';
         appendHighlighted(name, it.symbol, input.value.trim());
+        if (it.name) {
+          const plain = document.createElement('small');
+          plain.textContent = it.name; // from the data source: text, never HTML
+          name.append(plain);
+        }
         row.append(name);
         if (it.detail) {
           const detail = document.createElement('span');

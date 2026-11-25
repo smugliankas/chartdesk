@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Forex, gold, oil and stocks with no account: two new data sources, **Bybit TradFi**
+  (EUR/USD, GBP/USD, USD/JPY, gold, silver, oil, US stocks and ETFs) and **Binance TradFi**
+  (gold, silver, oil, US, Hong Kong and Korean stocks). Both are perpetual futures that follow
+  the real market; they trade around the clock, so there are weekend candles. Live updates,
+  older history as you scroll, and search by name ("gold", "apple").
+- Symbol search shows a plain name next to the code (XAUUSDT · Gold).
+- The watchlist can hold symbols from several sources at once. New symbols come from the
+  chart's source; symbols from another source show its name under them.
 - The style bar and the replay bar can be moved: drag the grip on their left. They stay where
   you put them; double-click the grip to put them back.
 - Dates and numbers are always in English, like the rest of the app, whatever the computer's

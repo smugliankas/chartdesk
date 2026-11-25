@@ -23,7 +23,9 @@ interface MiniTicker {
 export class BinanceProvider implements DataProvider {
   readonly id = 'binance';
   readonly name = 'Binance (crypto)';
+  readonly description = 'Binance spot market: crypto. Public data, no account needed.';
   readonly freeSymbolInput = true;
+  readonly defaultSymbol = 'BTCUSDT';
 
   private symbolList: Promise<{ symbol: string; change: number }[]> | null = null;
 

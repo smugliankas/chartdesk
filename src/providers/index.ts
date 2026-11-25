@@ -1,12 +1,16 @@
 import { BinanceProvider } from './binance';
+import { BinanceTradFiProvider } from './binanceTradfi';
+import { BybitTradFiProvider } from './bybit';
 import { CsvProvider } from './csv';
 import type { DataProvider } from './types';
 
 export const binance = new BinanceProvider();
 export const csv = new CsvProvider();
+export const binanceTradFi = new BinanceTradFiProvider();
+export const bybitTradFi = new BybitTradFiProvider();
 
 /** All available data sources, in the order they appear in the UI. Add new providers here. */
-export const PROVIDERS: readonly DataProvider[] = [binance, csv];
+export const PROVIDERS: readonly DataProvider[] = [binance, bybitTradFi, binanceTradFi, csv];
 
 export function getProvider(id: string): DataProvider {
   return PROVIDERS.find((p) => p.id === id) ?? PROVIDERS[0];

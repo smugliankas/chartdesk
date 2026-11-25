@@ -1,4 +1,4 @@
-import { getProvider, type Quote } from '../providers';
+import { getProvider, type DataProvider, type Quote } from '../providers';
 import { attachSymbolSearch } from './symbolSearch';
 
 export interface WatchItem {
@@ -11,8 +11,10 @@ interface Saved {
 }
 
 interface Options {
-  /** Data source used for new entries and quotes. */
+  /** Data source of the default list (for a first visit). */
   providerId: string;
+  /** Data source new entries come from: the chart's, when it can list prices. */
+  addProvider: () => DataProvider;
   /** The symbol on the chart, to highlight its row. */
   current: () => WatchItem;
   /** Switches the chart to a symbol. */
@@ -47,15 +49,17 @@ function formatQuotePrice(p: number, decimals?: number): string {
 }
 
 /** Watchlist view for the right panel: live prices of a list of symbols. Click a row to open it on the chart. */
-export function createWatchlist({ providerId, current, onSelect }: Options): {
+export function createWatchlist({ providerId, addProvider, current, onSelect }: Options): {
   element: HTMLElement;
   show: () => void;
   hide: () => void;
   sync: () => void;
 } {
   const state = load(providerId);
+  /** Quotes and rows by "provider:symbol": the same symbol can come from two sources. */
   const quotes = new Map<string, Quote>();
-  let stopQuotes: (() => void) | null = null;
+  const keyOf = (providerId: string, symbol: string) => `${providerId}:${symbol}`;
+  let stopQuotes: (() => void)[] = [];
   let visible = false;
 
   const save = () => {
@@ -80,14 +84,19 @@ export function createWatchlist({ providerId, current, onSelect }: Options): {
   const rowsEl = panel.querySelector<HTMLDivElement>('.wl-rows')!;
   const addInput = panel.querySelector<HTMLInputElement>('.wl-add input')!;
 
-  const provider = getProvider(providerId);
+  // New symbols come from the chart's data source (so a Bybit chart adds Bybit symbols).
+  const syncPlaceholder = () => {
+    addInput.placeholder = `Add symbol (${addProvider().name.replace(/\s*\(.*\)$/, '')})…`;
+  };
+  addInput.addEventListener('focus', syncPlaceholder);
   attachSymbolSearch(addInput, {
-    search: (q) => provider.searchSymbols?.(q) ?? null,
+    search: (q) => addProvider().searchSymbols?.(q) ?? null,
     onPick: (symbol) => {
       addInput.value = '';
       const s = symbol.toUpperCase();
-      if (!state.items.some((i) => i.providerId === providerId && i.symbol === s)) {
-        state.items.push({ providerId, symbol: s });
+      const pid = addProvider().id;
+      if (!state.items.some((i) => i.providerId === pid && i.symbol === s)) {
+        state.items.push({ providerId: pid, symbol: s });
         save();
         restartQuotes();
         render();
@@ -108,7 +117,17 @@ export function createWatchlist({ providerId, current, onSelect }: Options): {
 
       const name = document.createElement('span');
       name.className = 'wl-symbol';
-      name.textContent = item.symbol;
+      const code = document.createElement('span');
+      code.textContent = item.symbol;
+      name.append(code);
+      const source = getProvider(item.providerId);
+      if (item.providerId !== providerId) {
+        // Symbols from another source carry a small line with its name.
+        const tag = document.createElement('small');
+        tag.className = 'wl-source';
+        tag.textContent = source.name.replace(/\s*\(.*\)$/, '');
+        name.append(tag);
+      }
       const price = document.createElement('span');
       price.className = 'wl-price';
       const change = document.createElement('span');
@@ -127,9 +146,10 @@ export function createWatchlist({ providerId, current, onSelect }: Options): {
 
       row.append(name, price, change, remove);
       rowsEl.append(row);
-      rowEls.set(item.symbol, { row, price, change });
-      const q = quotes.get(item.symbol);
-      if (q) showQuote(q, false);
+      const key = keyOf(item.providerId, item.symbol);
+      rowEls.set(key, { row, price, change });
+      const q = quotes.get(key);
+      if (q) showQuote(key, q, false);
     }
     if (state.items.length === 0) {
       const empty = document.createElement('p');
@@ -139,11 +159,11 @@ export function createWatchlist({ providerId, current, onSelect }: Options): {
     }
   }
 
-  function showQuote(q: Quote, animate = true): void {
-    const el = rowEls.get(q.symbol);
+  function showQuote(key: string, q: Quote, animate = true): void {
+    const el = rowEls.get(key);
     if (!el) return;
-    const prev = quotes.get(q.symbol);
-    quotes.set(q.symbol, q);
+    const prev = quotes.get(key);
+    quotes.set(key, q);
     el.price.textContent = formatQuotePrice(q.price, q.decimals);
     el.change.textContent = `${q.changePct >= 0 ? '+' : ''}${q.changePct.toFixed(2)}%`;
     el.change.classList.toggle('up', q.changePct >= 0);
@@ -158,11 +178,17 @@ export function createWatchlist({ providerId, current, onSelect }: Options): {
 
   /** Prices stream only while the watchlist is on screen. */
   function restartQuotes(): void {
-    stopQuotes?.();
-    stopQuotes = null;
-    if (!visible || !provider.watchQuotes) return;
-    const symbols = state.items.filter((i) => i.providerId === providerId).map((i) => i.symbol);
-    stopQuotes = provider.watchQuotes(symbols, (q) => showQuote(q));
+    stopQuotes.forEach((stop) => stop());
+    stopQuotes = [];
+    if (!visible) return;
+    // One stream per data source.
+    const bySource = new Map<string, string[]>();
+    for (const i of state.items) bySource.set(i.providerId, [...(bySource.get(i.providerId) ?? []), i.symbol]);
+    for (const [pid, symbols] of bySource) {
+      const p = getProvider(pid);
+      if (p.id !== pid || !p.watchQuotes) continue;
+      stopQuotes.push(p.watchQuotes(symbols, (q) => showQuote(keyOf(pid, q.symbol), q)));
+    }
   }
 
   render();
@@ -177,11 +203,12 @@ export function createWatchlist({ providerId, current, onSelect }: Options): {
       visible = false;
       restartQuotes();
     },
-    /** Re-highlights the current symbol. */
+    /** Re-highlights the current symbol and names the source new symbols come from. */
     sync: () => {
+      syncPlaceholder();
       const cur = current();
       for (const item of state.items) {
-        rowEls.get(item.symbol)?.row.classList.toggle('current', item.providerId === cur.providerId && item.symbol === cur.symbol);
+        rowEls.get(keyOf(item.providerId, item.symbol))?.row.classList.toggle('current', item.providerId === cur.providerId && item.symbol === cur.symbol);
       }
     },
   };

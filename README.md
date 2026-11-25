@@ -15,8 +15,10 @@ your machine.
 
 - Candlestick chart with volume; timeframes 1m, 5m, 15m, 30m, 1H, 4H, 1D, 1W and 1M
 - Older history loads automatically as you scroll left
-- Symbol search (Binance), live updates for crypto
-- Watchlist with live prices and 24h change; click a symbol to open it
+- Crypto, forex, gold, oil and stocks with no account: Binance, plus Bybit and Binance
+  perpetual futures on traditional markets; symbol search with plain names, live updates
+- Watchlist with live prices and 24h change, mixing symbols from several sources; click a
+  symbol to open it
 - Price alerts with sound, desktop notification and on-screen message; set from the bell menu,
   the bell next to the price scale, `Alt/⌥` + `A`, or on a horizontal or sloped line. Watched for all symbols while ChartDesk is open
 - Countdown to bar close in the last-price label (can be turned off in the settings)
@@ -69,9 +71,16 @@ your machine.
 
 | Source | Markets | Notes |
 | --- | --- | --- |
-| **Binance** | Crypto | Public market data. No account or API key. Live updates. |
+| **Binance (crypto)** | Crypto | Spot market. Public data, no account or API key. Live updates. |
+| **Bybit TradFi** | Forex (EUR/USD, GBP/USD, USD/JPY…), gold, silver, oil, US stocks and ETFs | Perpetual futures. Public data, no account. Live updates. |
+| **Binance TradFi** | Gold, silver, oil, US, Hong Kong and Korean stocks | Perpetual futures. Public data, no account. Live updates. |
 | **CSV file** | Anything | MetaTrader 5 exports and most generic OHLC CSVs. Higher timeframes are built from the file. |
-| MT5 bridge | Forex, indices, metals (your broker's feed) | Planned. Windows only. |
+| FOREX.com | Forex, indices, metals | Planned (needs your own FOREX.com account). |
+
+The two TradFi sources show perpetual futures that follow the real market, not the market
+itself. They trade around the clock, so there are candles at night and on weekends when the
+real market is closed, and the price can be a little off the broker quote (for EUR/USD,
+about 10 to 20 pips while we tested).
 
 ### Getting a CSV from MetaTrader 5
 
@@ -136,7 +145,7 @@ src/
   main.ts                    UI wiring
   chart/ChartController.ts   chart, series, time ↔ bar-index mapping
   drawings/                  drawing tools (model, geometry, rendering, mouse handling, storage)
-  providers/                 data sources (Binance, CSV)
+  providers/                 data sources (Binance, Bybit, CSV)
   alerts/                    price alerts (checking, drawing on the chart, notifications)
   ui/                        toolbar, symbol search, watchlist, menus and dialogs
 tests/                       automated tests (npm test)
@@ -144,9 +153,10 @@ tests/                       automated tests (npm test)
 
 ## Roadmap
 
-- [ ] MT5 bridge (forex, indices and gold from your own broker)
+- [x] Forex, gold and stocks without an account (Bybit and Binance perpetual futures)
+- [x] Export/import drawings (Settings → Backup)
+- [ ] FOREX.com data with your own account
 - [ ] More timeframes and chart types
-- [ ] Export/import drawings
 - [ ] Desktop app (Tauri) for Windows and macOS
 
 ## License
