@@ -1,13 +1,19 @@
 import type { DrawingManager } from '../drawings/DrawingManager';
-import type { Drawing } from '../drawings/model';
 import {
   DEFAULT_FONT_SIZE,
+  DEFAULT_LOSS_COLOR,
+  DEFAULT_PROFIT_COLOR,
   DEFAULT_WIDTH,
+  FIB_LEVELS,
+  fibLevelsOf,
+  fibShowsTrendLine,
   FONT_SIZES,
   LINE_STYLES,
   LINE_WIDTHS,
   PALETTE,
   styleSupport,
+  type Drawing,
+  type DrawingStyle,
   type LineStyle,
 } from '../drawings/model';
 import { ICONS } from './tools';
@@ -23,11 +29,12 @@ const STYLE_ICONS: Record<LineStyle, string> = {
 
 const STYLE_NAMES: Record<LineStyle, string> = { solid: 'Solid', dashed: 'Dashed', dotted: 'Dotted' };
 
-/**
- * Floating bar shown above the chart while a drawing is selected:
- * color, line width, line style, font size and delete.
- * Returns a function that refreshes it; call it whenever the drawings change.
- */
+const LEVELS_ICON =
+  '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h16"/><path d="M17 10l2 2-2 2"/></svg>';
+
+/** Which color the palette is currently picking. */
+type ColorTarget = 'color' | 'profitColor' | 'lossColor';
+
 export interface LineAlertHooks {
   /** Whether alerts can be set on this kind of drawing. */
   supports: (d: Drawing) => boolean;
@@ -37,6 +44,12 @@ export interface LineAlertHooks {
   toggle: (d: Drawing) => void;
 }
 
+/**
+ * Floating bar shown above the chart while a drawing is selected. It shows only the
+ * controls that apply: color, line width and style, font size, target/stop colors for
+ * positions, levels for Fibonacci, an alert toggle for lines, and delete.
+ * Returns a function that refreshes it; call it whenever the drawings change.
+ */
 export function createStyleBar(host: HTMLElement, drawings: DrawingManager, alerts?: LineAlertHooks): () => void {
   const bar = document.createElement('div');
   bar.id = 'styleBar';
@@ -58,22 +71,26 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     parent.append(b);
     return b;
   };
+  const swatchButton = (parent: HTMLElement, title: string, target: ColorTarget) => {
+    const b = button(parent, '<span class="swatch"></span>', title, () => openPalette(b, target));
+    return { button: b, swatch: b.querySelector<HTMLSpanElement>('.swatch')! };
+  };
 
-  // --- color --------------------------------------------------------------
-  const colorGroup = group();
-  const colorButton = button(colorGroup, '<span class="swatch"></span>', 'Color', () => palette.classList.toggle('hidden'));
-  const swatch = colorButton.querySelector<HTMLSpanElement>('.swatch')!;
-
+  // --- shared color palette ----------------------------------------------------
   const palette = document.createElement('div');
   palette.className = 'palette hidden';
-  colorGroup.append(palette);
+  bar.append(palette);
+  let paletteTarget: ColorTarget = 'color';
+
+  const setColor = (color: string, live = false) => drawings.setStyle({ [paletteTarget]: color } as DrawingStyle, live);
+
   for (const c of PALETTE) {
     const s = document.createElement('button');
     s.className = 'palette-swatch';
     s.style.background = c;
     s.title = c;
     s.addEventListener('click', () => {
-      drawings.setStyle({ color: c });
+      setColor(c);
       palette.classList.add('hidden');
     });
     palette.append(s);
@@ -83,18 +100,38 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
   custom.textContent = 'Custom…';
   const picker = document.createElement('input');
   picker.type = 'color';
-  picker.addEventListener('input', () => drawings.setStyle({ color: picker.value }, true));
-  picker.addEventListener('change', () => drawings.setStyle({ color: picker.value }));
+  picker.addEventListener('input', () => setColor(picker.value, true));
+  picker.addEventListener('change', () => setColor(picker.value));
   custom.append(picker);
   palette.append(custom);
 
-  // Close the palette on any click outside it.
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') palette.classList.add('hidden');
-  });
-  document.addEventListener('mousedown', (e) => {
-    if (!colorGroup.contains(e.target as Node)) palette.classList.add('hidden');
-  });
+  const currentColor = (target: ColorTarget): string => {
+    const d = drawings.selectedDrawing;
+    if (!d) return '#000000';
+    if (target === 'color') return d.color;
+    if (d.type !== 'long' && d.type !== 'short') return d.color;
+    return target === 'profitColor' ? (d.profitColor ?? DEFAULT_PROFIT_COLOR) : (d.lossColor ?? DEFAULT_LOSS_COLOR);
+  };
+
+  function openPalette(anchor: HTMLElement, target: ColorTarget): void {
+    const wasOpenHere = !palette.classList.contains('hidden') && paletteTarget === target;
+    closePopovers();
+    if (wasOpenHere) return;
+    paletteTarget = target;
+    const color = currentColor(target);
+    if (/^#[0-9a-f]{6}$/i.test(color)) picker.value = color;
+    palette.style.left = `${anchor.offsetLeft + anchor.parentElement!.offsetLeft}px`;
+    palette.classList.remove('hidden');
+  }
+
+  // --- color --------------------------------------------------------------
+  const colorGroup = group();
+  const lineColor = swatchButton(colorGroup, 'Color', 'color');
+
+  // --- position zones ---------------------------------------------------------
+  const zoneGroup = group();
+  const profitColor = swatchButton(zoneGroup, 'Target zone color', 'profitColor');
+  const lossColor = swatchButton(zoneGroup, 'Stop zone color', 'lossColor');
 
   // --- line width & style ---------------------------------------------------
   const widthGroup = group();
@@ -109,6 +146,45 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     styleButtons.set(s, button(lineStyleGroup, STYLE_ICONS[s], STYLE_NAMES[s], () => drawings.setStyle({ lineStyle: s })));
   }
 
+  // --- Fibonacci levels ---------------------------------------------------------
+  const fibGroup = group();
+  const levelsButton = button(fibGroup, LEVELS_ICON, 'Levels and trend line', () => {
+    const open = !levelsMenu.classList.contains('hidden');
+    closePopovers();
+    if (!open) {
+      levelsMenu.style.left = `${fibGroup.offsetLeft}px`;
+      levelsMenu.classList.remove('hidden');
+    }
+  });
+  const levelsMenu = document.createElement('div');
+  levelsMenu.className = 'levels-menu hidden';
+  bar.append(levelsMenu);
+
+  const levelChecks = new Map<number, HTMLInputElement>();
+  for (const level of FIB_LEVELS) {
+    const label = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.addEventListener('change', () => {
+      const d = drawings.selectedDrawing;
+      if (!d || d.type !== 'fib') return;
+      const set = new Set(fibLevelsOf(d));
+      if (box.checked) set.add(level);
+      else set.delete(level);
+      drawings.setStyle({ levels: [...set] });
+    });
+    label.append(box, String(level));
+    levelsMenu.append(label);
+    levelChecks.set(level, box);
+  }
+  const trendLabel = document.createElement('label');
+  trendLabel.className = 'levels-trend';
+  const trendBox = document.createElement('input');
+  trendBox.type = 'checkbox';
+  trendBox.addEventListener('change', () => drawings.setStyle({ trendLine: trendBox.checked }));
+  trendLabel.append(trendBox, 'Trend line');
+  levelsMenu.append(trendLabel);
+
   // --- font size ------------------------------------------------------------
   const fontGroup = group();
   const fontSelect = document.createElement('select');
@@ -117,7 +193,6 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
   fontSelect.addEventListener('change', () => drawings.setStyle({ fontSize: Number(fontSelect.value) }));
   fontGroup.append(fontSelect);
 
-  // --- delete -----------------------------------------------------------------
   // --- alert (horizontal and sloped lines) --------------------------------------
   const alertGroup = group();
   const alertButton = button(alertGroup, ICONS.bell, 'Alert when price crosses this line', () => {
@@ -125,30 +200,53 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     if (d && alerts) alerts.toggle(d);
   });
 
+  // --- delete -----------------------------------------------------------------
   const deleteGroup = group();
   button(deleteGroup, ICONS.trash, 'Delete (Del)', () => drawings.deleteSelected()).classList.add('danger');
+
+  // --- closing popovers ---------------------------------------------------------
+  function closePopovers(): void {
+    palette.classList.add('hidden');
+    levelsMenu.classList.add('hidden');
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closePopovers();
+  });
+  document.addEventListener('mousedown', (e) => {
+    if (!bar.contains(e.target as Node)) closePopovers();
+  });
 
   return () => {
     const d = drawings.currentTool === 'cursor' ? drawings.selectedDrawing : null;
     bar.classList.toggle('hidden', !d);
     if (!d) {
-      palette.classList.add('hidden');
+      closePopovers();
       return;
     }
     const support = styleSupport(d.type);
     colorGroup.classList.toggle('hidden', !support.color);
+    zoneGroup.classList.toggle('hidden', !support.zones);
     widthGroup.classList.toggle('hidden', !support.line);
     lineStyleGroup.classList.toggle('hidden', !support.line);
+    fibGroup.classList.toggle('hidden', !support.fib);
     fontGroup.classList.toggle('hidden', !support.font);
     alertGroup.classList.toggle('hidden', !alerts?.supports(d));
     alertButton.classList.toggle('active', !!alerts?.has(d.id));
+    if (!support.fib) levelsMenu.classList.add('hidden');
 
-    swatch.style.background = d.color;
-    if (/^#[0-9a-f]{6}$/i.test(d.color)) picker.value = d.color;
+    lineColor.swatch.style.background = d.color;
+    profitColor.swatch.style.background = currentColor('profitColor');
+    lossColor.swatch.style.background = currentColor('lossColor');
     const width = d.width ?? DEFAULT_WIDTH;
     for (const [w, b] of widthButtons) b.classList.toggle('active', w === width);
     const lineStyle = d.lineStyle ?? 'solid';
     for (const [s, b] of styleButtons) b.classList.toggle('active', s === lineStyle);
     if (d.type === 'text') fontSelect.value = String(d.fontSize ?? DEFAULT_FONT_SIZE);
+    if (d.type === 'fib') {
+      const shown = new Set(fibLevelsOf(d));
+      for (const [level, box] of levelChecks) box.checked = shown.has(level);
+      trendBox.checked = fibShowsTrendLine(d);
+      levelsButton.classList.toggle('active', !levelsMenu.classList.contains('hidden'));
+    }
   };
 }

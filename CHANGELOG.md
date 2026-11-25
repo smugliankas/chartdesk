@@ -10,6 +10,14 @@
   alerts can be turned on again or cleared. Hover an alert line to see its price and a ×
   to delete it; drag the line to move the alert. Alerts use the chart's text color.
 
+- Long/short positions: handles work like TradingView's (entry handle: entry price and start
+  time; target and stop: price only; right edge: end time only), and target or stop can no
+  longer be dragged across the entry. Target and stop zone colors can be changed from the
+  style bar.
+- Fibonacci: level labels are now to the right of the lines. Turn each level on or off (e.g. only 0, 0.5 and 1 for a range) and hide the dashed
+  trend line, from the levels button in the style bar. New Fibonacci drawings start with the
+  last choice.
+- Style bar: separators only appear between the controls that are shown.
 - Hold ⌘ (Mac) or Ctrl (Windows/Linux) for a temporary magnet, like TradingView: while held,
   the crosshair and drawing points snap to the nearest open, high, low or close. If the magnet
   is already on, holding the key turns it off. The crosshair now also snaps while the magnet is on.

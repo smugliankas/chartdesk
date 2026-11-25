@@ -20,12 +20,22 @@ export type Ray = Base & { type: 'ray'; p1: Point; p2: Point };
 /** Passes through p1 and p2 and continues in both directions. */
 export type ExtendedLine = Base & { type: 'extended'; p1: Point; p2: Point };
 export type Rectangle = Base & { type: 'rect'; p1: Point; p2: Point };
-export type FibRetracement = Base & { type: 'fib'; p1: Point; p2: Point };
+/** `levels`: the levels shown (all when missing). `trendLine`: the dashed diagonal (shown unless false). */
+export type FibRetracement = Base & { type: 'fib'; p1: Point; p2: Point; levels?: number[]; trendLine?: boolean };
 export type HorizontalLine = Base & { type: 'hline'; price: number };
 export type VerticalLine = Base & { type: 'vline'; time: number };
 export type TextNote = Base & { type: 'text'; p: Point; text: string; fontSize?: number };
 /** Long or short position: entry, take-profit and stop-loss prices, drawn from entry time to `endTime`. */
-export type Position = Base & { type: 'long' | 'short'; entry: Point; tp: number; sl: number; endTime: number };
+export type Position = Base & {
+  type: 'long' | 'short';
+  entry: Point;
+  tp: number;
+  sl: number;
+  endTime: number;
+  /** Colors of the target (profit) and stop (loss) zones. */
+  profitColor?: string;
+  lossColor?: string;
+};
 
 export type Drawing =
   | TrendLine
@@ -74,7 +84,14 @@ export interface DrawingStyle {
   width?: number;
   lineStyle?: LineStyle;
   fontSize?: number;
+  profitColor?: string;
+  lossColor?: string;
+  levels?: number[];
+  trendLine?: boolean;
 }
+
+export const DEFAULT_PROFIT_COLOR = '#26a69a';
+export const DEFAULT_LOSS_COLOR = '#ef5350';
 
 export const DEFAULT_WIDTH = 1;
 export const DEFAULT_FONT_SIZE = 13;
@@ -88,20 +105,40 @@ export const PALETTE: readonly string[] = [
   '#b07cff', '#7e57c2', '#795548', '#000000',
 ];
 
-/** Which style controls apply to a drawing type. Positions use fixed green/red zones. */
-export function styleSupport(type: DrawingType): { color: boolean; line: boolean; font: boolean } {
+export interface StyleSupport {
+  color: boolean;
+  line: boolean;
+  font: boolean;
+  /** Target/stop zone colors (positions). */
+  zones: boolean;
+  /** Level toggles and trend line (Fibonacci). */
+  fib: boolean;
+}
+
+/** Which style controls apply to a drawing type. */
+export function styleSupport(type: DrawingType): StyleSupport {
   switch (type) {
     case 'long':
     case 'short':
-      return { color: false, line: false, font: false };
+      return { color: false, line: false, font: false, zones: true, fib: false };
     case 'text':
-      return { color: true, line: false, font: true };
+      return { color: true, line: false, font: true, zones: false, fib: false };
+    case 'fib':
+      return { color: true, line: true, font: false, zones: false, fib: true };
     default:
-      return { color: true, line: true, font: false };
+      return { color: true, line: true, font: false, zones: false, fib: false };
   }
 }
 
 export const FIB_LEVELS: readonly number[] = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+
+export function fibLevelsOf(d: FibRetracement): readonly number[] {
+  return d.levels ?? FIB_LEVELS;
+}
+
+export function fibShowsTrendLine(d: FibRetracement): boolean {
+  return d.trendLine !== false;
+}
 
 /** Price at a Fibonacci level. Level 0 is at the end point (p2), level 1 at the start point (p1). */
 export function fibPrice(d: FibRetracement, level: number): number {

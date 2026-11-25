@@ -7,8 +7,9 @@ import {
   DEFAULT_COLORS,
   DEFAULT_FONT_SIZE,
   DEFAULT_WIDTH,
-  FIB_LEVELS,
+  fibLevelsOf,
   fibPrice,
+  fibShowsTrendLine,
   isTwoPointType,
   measureText,
   newId,
@@ -150,6 +151,10 @@ export class DrawingManager implements DrawingSource {
     if (support.line && patch.width) clean.width = patch.width;
     if (support.line && patch.lineStyle) clean.lineStyle = patch.lineStyle;
     if (support.font && patch.fontSize) clean.fontSize = patch.fontSize;
+    if (support.zones && patch.profitColor) clean.profitColor = patch.profitColor;
+    if (support.zones && patch.lossColor) clean.lossColor = patch.lossColor;
+    if (support.fib && patch.levels) clean.levels = [...patch.levels].sort((x, y) => x - y);
+    if (support.fib && patch.trendLine !== undefined) clean.trendLine = patch.trendLine;
 
     this.drawings = this.drawings.map((x) => (x.id === d.id ? ({ ...x, ...clean } as Drawing) : x));
     if (!live) {
@@ -341,7 +346,7 @@ export class DrawingManager implements DrawingSource {
     return {
       id: newId(),
       type,
-      color: DEFAULT_COLORS[type],
+      ...this.styleFor(type),
       entry,
       tp: entry.price + dir * risk * 2,
       sl: entry.price - dir * risk,
@@ -486,9 +491,9 @@ export class DrawingManager implements DrawingSource {
           y <= Math.max(a.y, b.y) + LINE_TOLERANCE
         );
       case 'fib': {
-        if (distToSegment(x, y, a.x, a.y, b.x, b.y) <= LINE_TOLERANCE) return true;
+        if (fibShowsTrendLine(d) && distToSegment(x, y, a.x, a.y, b.x, b.y) <= LINE_TOLERANCE) return true;
         if (x < Math.min(a.x, b.x) - LINE_TOLERANCE || x > Math.max(a.x, b.x) + LINE_TOLERANCE) return false;
-        return FIB_LEVELS.some((level) => {
+        return fibLevelsOf(d).some((level) => {
           const ly = this.cc.priceToY(fibPrice(d, level));
           return ly !== null && Math.abs(ly - y) <= LINE_TOLERANCE;
         });

@@ -341,7 +341,8 @@ button.icon svg {
   padding: 0 3px;
 }
 
-.sb-group + .sb-group {
+/* Separators only between groups that are shown. */
+.sb-group:not(.hidden) ~ .sb-group:not(.hidden) {
   border-left: 1px solid var(--border);
 }
 
@@ -1123,4 +1124,35 @@ body.light #timeframes {
   border-color: var(--active-border);
   box-shadow: var(--active-glow);
   font-weight: 600;
+}
+
+/* Fibonacci levels menu in the style bar. */
+.levels-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 6px 18px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  animation: pop-in var(--t-med) var(--ease-out);
+}
+
+.levels-menu label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.levels-menu .levels-trend {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
 }

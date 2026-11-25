@@ -39,12 +39,29 @@ export function moveHandle(d: Drawing, part: HandlePart, pt: Point): Drawing {
     case 'fib':
       return part === 'p1' ? { ...d, p1: pt } : part === 'p2' ? { ...d, p2: pt } : d;
     case 'long':
-    case 'short':
-      if (part === 'entry') return { ...d, entry: pt };
-      if (part === 'tp') return { ...d, tp: pt.price };
-      if (part === 'sl') return { ...d, sl: pt.price };
+    case 'short': {
+      // Same as TradingView: the entry handle (left edge, at the entry price) moves the entry
+      // price and the start time; target and stop move their price only; the right edge
+      // moves the end time only. Levels can't be dragged across the entry.
+      const long = d.type === 'long';
+      const gap = Math.abs(d.entry.price) * 1e-5 || 1e-8;
+      const above = Math.max(d.tp, d.sl);
+      const below = Math.min(d.tp, d.sl);
+      if (part === 'entry') {
+        const price = Math.min(above - gap, Math.max(below + gap, pt.price));
+        return { ...d, entry: { time: Math.min(pt.time, d.endTime), price } };
+      }
       if (part === 'end') return { ...d, endTime: Math.max(pt.time, d.entry.time) };
+      if (part === 'tp') {
+        const tp = long ? Math.max(pt.price, d.entry.price + gap) : Math.min(pt.price, d.entry.price - gap);
+        return { ...d, tp };
+      }
+      if (part === 'sl') {
+        const sl = long ? Math.min(pt.price, d.entry.price - gap) : Math.max(pt.price, d.entry.price + gap);
+        return { ...d, sl };
+      }
       return d;
+    }
     default:
       return d;
   }

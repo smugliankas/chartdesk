@@ -12,8 +12,11 @@ import { extendSegment, handlesOf } from './geometry';
 import {
   DEFAULT_FONT_SIZE,
   DEFAULT_WIDTH,
-  FIB_LEVELS,
+  DEFAULT_LOSS_COLOR,
+  DEFAULT_PROFIT_COLOR,
+  fibLevelsOf,
   fibPrice,
+  fibShowsTrendLine,
   formatDuration,
   measureText,
   TEXT_PADDING,
@@ -172,18 +175,22 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         if (!a || !b) break;
         const left = Math.min(a.x, b.x);
         const right = Math.max(a.x, b.x);
-        ctx.save();
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        line(ctx, a.x, a.y, b.x, b.y);
-        ctx.restore();
-        ctx.textBaseline = 'bottom';
-        for (const level of FIB_LEVELS) {
+        if (fibShowsTrendLine(d)) {
+          ctx.save();
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          line(ctx, a.x, a.y, b.x, b.y);
+          ctx.restore();
+        }
+        // Level labels sit to the right of the lines, so they never cross the candles inside.
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'left';
+        for (const level of fibLevelsOf(d)) {
           const price = fibPrice(d, level);
           const y = this.cc.priceToY(price);
           if (y === null) continue;
           line(ctx, left, y, right, y);
-          ctx.fillText(`${level} (${this.cc.formatPrice(price)})`, left + 4, y - 2);
+          ctx.fillText(`${level} (${this.cc.formatPrice(price)})`, right + 6, y);
         }
         break;
       }
@@ -241,8 +248,10 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       ctx.fillRect(left, Math.min(y1, y2), w, Math.abs(y2 - y1));
       ctx.globalAlpha = 1;
     };
-    zone(yE, yT, '#26a69a');
-    zone(yE, yS, '#ef5350');
+    const profit = d.profitColor ?? DEFAULT_PROFIT_COLOR;
+    const loss = d.lossColor ?? DEFAULT_LOSS_COLOR;
+    zone(yE, yT, profit);
+    zone(yE, yS, loss);
 
     ctx.strokeStyle = this.cc.themeColors.text;
     ctx.lineWidth = 1;
@@ -255,8 +264,8 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     const rr = risk > 0 ? (reward / risk).toFixed(2) : '∞';
 
     const cx = left + w / 2;
-    label(ctx, `Target ${this.cc.formatPrice(d.tp)} (${pct(reward)}%)`, cx, yT, yT < yE ? 'above' : 'below', '#26a69a');
-    label(ctx, `Stop ${this.cc.formatPrice(d.sl)} (${pct(risk)}%)`, cx, yS, yS < yE ? 'above' : 'below', '#ef5350');
+    label(ctx, `Target ${this.cc.formatPrice(d.tp)} (${pct(reward)}%)`, cx, yT, yT < yE ? 'above' : 'below', profit);
+    label(ctx, `Stop ${this.cc.formatPrice(d.sl)} (${pct(risk)}%)`, cx, yS, yS < yE ? 'above' : 'below', loss);
     label(ctx, `${d.type === 'long' ? 'Long' : 'Short'} · R:R ${rr}`, cx, yE, 'center', '#3a4154');
   }
 
