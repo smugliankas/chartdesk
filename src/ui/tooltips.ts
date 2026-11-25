@@ -70,6 +70,7 @@ export function installTooltips(): void {
   };
 
   document.addEventListener('mouseover', (e) => {
+    if (e.buttons !== 0) return; // no tooltips while dragging
     const el = (e.target as HTMLElement | null)?.closest<HTMLElement>('[title], [data-tip]');
     if (!el || el === current) return;
     const text = textOf(el);
@@ -92,6 +93,9 @@ export function installTooltips(): void {
     if (to && current.contains(to)) return;
     if ((e.target as Node) === current || current.contains(e.target as Node)) hide();
   });
+  // pointerdown too: a drag that cancels the mouse events (the grips on the floating bars)
+  // would otherwise leave the tooltip on screen.
+  document.addEventListener('pointerdown', hide, true);
   document.addEventListener('mousedown', hide, true);
   document.addEventListener('keydown', hide, true);
   window.addEventListener('blur', hide);
