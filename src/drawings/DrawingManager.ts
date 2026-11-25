@@ -124,15 +124,24 @@ export class DrawingManager implements DrawingSource {
     return this.magnet;
   }
 
-  /** The magnet as it acts right now: the setting, flipped while ⌘/Ctrl is held. */
+  /**
+   * The magnet as it acts right now: the setting, flipped while ⌘/Ctrl is held. It acts only
+   * while drawing (a drawing tool is picked) or moving a drawing; with the plain cursor the
+   * crosshair moves freely, so ⌘/Ctrl shortcuts don't make it jump to the candles.
+   */
   private get magnetActive(): boolean {
-    return this.magnet !== this.magnetHeld;
+    const drawing = this.tool !== 'cursor' || this.drag !== null;
+    return drawing && this.magnet !== this.magnetHeld;
+  }
+
+  private syncCrosshairMagnet(): void {
+    this.cc.setCrosshairMagnet(this.magnetActive);
   }
 
   private setMagnetHeld(held: boolean): void {
     if (held === this.magnetHeld) return;
     this.magnetHeld = held;
-    this.cc.setCrosshairMagnet(this.magnetActive);
+    this.syncCrosshairMagnet();
     if (this.pending || this.measuring || this.drag) this.redraw();
   }
 
@@ -211,13 +220,14 @@ export class DrawingManager implements DrawingSource {
       this.measure = null;
     }
     this.container.style.cursor = tool === 'cursor' ? '' : 'crosshair';
+    this.syncCrosshairMagnet();
     this.listeners.tool.forEach((fn) => fn(tool));
     this.changed();
   }
 
   setMagnet(on: boolean): void {
     this.magnet = on;
-    this.cc.setCrosshairMagnet(this.magnetActive);
+    this.syncCrosshairMagnet();
     this.changed();
   }
 
@@ -549,8 +559,16 @@ export class DrawingManager implements DrawingSource {
       const p = this.toPoint(a.x, y, false);
       return p && { time: anchor.time, price: p.price };
     }
+    // 45°: the end snaps to a bar in time, so take the bar first and then make the height match
+    // its exact distance. Snapping x while y followed the mouse made the slope wobble.
     const len = Math.max(Math.abs(dx), Math.abs(dy));
-    return this.toPoint(a.x + Math.sign(dx) * len, a.y + Math.sign(dy) * len, false);
+    const logicalRaw = this.cc.xToLogical(a.x + Math.sign(dx) * len);
+    if (logicalRaw === null) return null;
+    const logical = Math.round(logicalRaw);
+    const bx = this.cc.logicalToX(logical);
+    if (bx === null) return null;
+    const price = this.cc.yToPrice(a.y + Math.sign(dy) * Math.abs(bx - a.x));
+    return price === null ? null : { time: this.cc.logicalToTime(logical), price };
   }
 
   // --- creating drawings -------------------------------------------------------------
@@ -896,6 +914,7 @@ export class DrawingManager implements DrawingSource {
         startPrice: price,
         before: this.snapshot(),
       };
+      this.syncCrosshairMagnet();
       window.addEventListener('mousemove', this.onDragMove);
       window.addEventListener('mouseup', this.onDragEnd);
     }
@@ -992,6 +1011,7 @@ export class DrawingManager implements DrawingSource {
     window.removeEventListener('mouseup', this.onDragEnd);
     const drag = this.drag;
     this.drag = null;
+    this.syncCrosshairMagnet();
     if (drag && JSON.stringify(drag.before) !== JSON.stringify(this.drawings)) {
       this.pushHistory(drag.before);
       this.save();

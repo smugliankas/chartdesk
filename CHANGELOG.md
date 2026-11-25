@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Lines held at 45° with ⇧ (Shift) no longer wobble: the end snaps to a bar first and the
+  height follows it exactly.
+- A selected drawing keeps its width and gets a soft glow in its own color, with its handles,
+  instead of turning thicker.
+- The magnet (and holding ⌘/Ctrl) acts only while drawing or moving a drawing. With the plain
+  cursor the crosshair moves freely, so ⌘/Ctrl shortcuts don't make it jump to the candles.
+- "Remove all drawings" and "Restore backup" ask in the app's own dialog instead of the
+  browser's box at the top of the window.
+- Tooltips use the theme's colors (dark on the dark theme) instead of a white bubble.
 - The alert bell next to the price scale glides with the mouse: before, it stood still while
   the mouse was on it and then jumped (a couple of dollars at a time on gold), so some prices
   couldn't be picked.

@@ -6,6 +6,7 @@
 import type { Drawing } from './drawings/model';
 import { formatDateTime } from './format';
 import { allDrawings, DRAWINGS_PREFIX, flushDrawings, replaceDrawings } from './drawings/storage';
+import { confirmDialog } from './ui/confirmDialog';
 
 const PREFIX = 'chartdesk:';
 /** Keys from before the project was named ChartDesk. */
@@ -163,11 +164,15 @@ export function chooseAndRestoreBackup(onError: (message: string) => void): void
       ];
       if (s.hasSettings) parts.push('settings');
       const date = backup.exportedAt ? ` from ${formatDateTime(Date.parse(backup.exportedAt) / 1000)}` : '';
-      const ok = confirm(
-        `Restore this backup${date}?\n\n${parts.join(', ')}.\n\n` +
+      const ok = await confirmDialog({
+        title: `Restore this backup${date}?`,
+        message:
+          `It has ${parts.join(', ')}.\n\n` +
           'Drawings on these symbols, your alerts, watchlist and settings will be replaced by the ones in the backup. ' +
           'Drawings on other symbols are kept.',
-      );
+        confirmLabel: 'Restore',
+        danger: true,
+      });
       if (!ok) return;
       await replaceDrawings(restoreBackup(backup));
       location.reload();

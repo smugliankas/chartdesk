@@ -252,7 +252,12 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
     const width = d.width ?? DEFAULT_WIDTH;
-    ctx.lineWidth = width + (selected ? 0.75 : 0);
+    ctx.lineWidth = width;
+    // Selected: the same line with a soft glow in its own color, instead of a thicker line.
+    if (selected) {
+      ctx.shadowColor = glowColor(color);
+      ctx.shadowBlur = 6 * (window.devicePixelRatio || 1); // the blur is in screen pixels
+    }
     setDash(ctx, d.lineStyle ?? 'solid', width);
     ctx.font = LABEL_FONT;
     const reach = (size.w + size.h) * 4;
@@ -426,6 +431,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         break;
     }
 
+    ctx.shadowBlur = 0;
     if (selected && !d.locked) {
       ctx.setLineDash([]);
       for (const h of handlesOf(d)) {
@@ -594,8 +600,17 @@ function segmentCrossesRect(x1: number, y1: number, x2: number, y2: number, left
 }
 
 /** Undoes the state changes a drawing may leave behind. */
+/** The glow around a selected drawing: its color, slightly see-through. */
+function glowColor(color: string): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!m) return color;
+  const n = parseInt(m[1], 16);
+  return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, 1)`;
+}
+
 function resetState(ctx: CanvasRenderingContext2D): void {
   ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
   ctx.setLineDash([]);
   ctx.lineCap = 'butt';
   ctx.lineJoin = 'miter';

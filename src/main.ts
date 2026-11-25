@@ -36,6 +36,7 @@ import { AUTO_SCALE_KEYS, FULLSCREEN_KEYS, setupFullscreen } from './ui/fullscre
 import { createRightPanel } from './ui/rightPanel';
 import { createWatchlist } from './ui/watchlist';
 import { enhanceSelect } from './ui/selectMenu';
+import { confirmDialog } from './ui/confirmDialog';
 import { installTooltips } from './ui/tooltips';
 import { ALT, HOLD, ICONS, MOD, TOOL_GROUPS, TOOLS, toolDef, toolTitle } from './ui/tools';
 
@@ -404,18 +405,27 @@ for (const [i, tools] of TOOL_GROUPS.entries()) {
   if (i === 0) separator();
 }
 separator();
-const magnetButton = sidebarButton(ICONS.magnet, `Magnet: snap to open/high/low/close (hold ${HOLD})`, () => {
+/** Asks in the app's own dialog, then removes every drawing on this symbol (undo brings them back). */
+async function confirmClearAll(): Promise<void> {
+  const n = drawings.drawings.length;
+  if (n === 0) return;
+  const ok = await confirmDialog({
+    title: `Remove all drawings on ${symbol}?`,
+    message: `${n} drawing${n === 1 ? '' : 's'} will be removed from this symbol on every timeframe. Undo (${MOD}Z) brings them back.`,
+    confirmLabel: 'Remove all',
+    danger: true,
+  });
+  if (ok) drawings.clearAll();
+}
+
+const magnetButton = sidebarButton(ICONS.magnet, `Magnet: drawings snap to open/high/low/close (hold ${HOLD})`, () => {
   drawings.setMagnet(!drawings.magnetOn);
   settings.magnet = drawings.magnetOn;
   saveSettings();
 });
 const hideButton = sidebarButton(ICONS.eye, 'Hide all drawings', () => drawings.setHidden(!drawings.hidden));
 const deleteButton = sidebarButton(ICONS.trash, 'Delete selected drawing (Del)', () => drawings.deleteSelected());
-const clearButton = sidebarButton(ICONS.trashAll, 'Remove all drawings on this symbol', () => {
-  if (drawings.drawings.length && confirm(`Remove all ${drawings.drawings.length} drawings on ${symbol}?`)) {
-    drawings.clearAll();
-  }
-});
+const clearButton = sidebarButton(ICONS.trashAll, 'Remove all drawings on this symbol', () => void confirmClearAll());
 clearButton.classList.add('danger');
 
 // --- alerts -------------------------------------------------------------------------
@@ -757,9 +767,7 @@ chartEl.addEventListener('contextmenu', (e) => {
       label: 'Remove all drawings',
       danger: true,
       disabled: drawings.drawings.length === 0,
-      action: () => {
-        if (confirm(`Remove all ${drawings.drawings.length} drawings on ${symbol}?`)) drawings.clearAll();
-      },
+      action: () => void confirmClearAll(),
     },
   ]);
 });
