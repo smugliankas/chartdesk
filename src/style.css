@@ -221,7 +221,7 @@ button.icon svg {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  width: 54px;
+  width: 58px;
   padding: 6px 0;
   background: var(--panel);
   border-right: 1px solid var(--border);
@@ -258,7 +258,7 @@ button.icon svg {
 #sidebar .sep {
   width: 26px;
   height: 1px;
-  margin: 4px 11px 4px 0; /* centered under the buttons, which leave room for the group strip */
+  margin: 4px 14px 4px 0; /* centered under the buttons, which leave room for the group strip */
   background: var(--border);
 }
 
@@ -1474,7 +1474,7 @@ body.light #timeframes {
 
 .tool-group.single,
 #sidebar > .tool {
-  margin-right: 11px;
+  margin-right: 14px;
 }
 
 .tool-group:not(.single):hover,
@@ -1512,7 +1512,8 @@ body.light #timeframes {
 .tool-more,
 .tool-more:hover:not(:disabled),
 .tool-more:active:not(:disabled) {
-  width: 11px;
+  position: relative;
+  width: 14px;
   height: 34px;
   padding: 0;
   border: none;
@@ -1523,12 +1524,6 @@ body.light #timeframes {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.tool-more,
-.tool-more:hover:not(:disabled),
-.tool-more:active:not(:disabled) {
-  padding-left: 3px; /* the arrow sits a little right of center, away from the hairline */
 }
 
 .tool-more {
@@ -1542,7 +1537,7 @@ body.light #timeframes {
   position: absolute;
   top: 7px;
   bottom: 7px;
-  margin-left: -11px;
+  left: 0;
   width: 1px;
   background: currentColor;
   opacity: 0;
