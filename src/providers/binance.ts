@@ -76,6 +76,25 @@ export class BinanceProvider implements DataProvider {
     }));
   }
 
+  /** Price decimals per symbol, from the exchange's tick size ("0.01000000" → 2). */
+  private tickDecimals = new Map<string, number>();
+
+  private async loadTickDecimals(symbols: string[]): Promise<void> {
+    const missing = symbols.filter((s) => !this.tickDecimals.has(s));
+    if (missing.length === 0) return;
+    try {
+      const info = await getJson<ExchangeInfo>(
+        `${REST_URL}/exchangeInfo?symbols=${encodeURIComponent(JSON.stringify(missing))}&showPermissionSets=false`,
+      );
+      for (const s of info.symbols ?? []) {
+        const tick = s.filters?.find((f) => f.filterType === 'PRICE_FILTER')?.tickSize;
+        if (tick) this.tickDecimals.set(s.symbol, decimalsOf(tick));
+      }
+    } catch {
+      /* fall back to rounding by price size */
+    }
+  }
+
   watchQuotes(symbols: string[], onQuote: (q: Quote) => void): () => void {
     const list = [...new Set(symbols.map((s) => s.toUpperCase()))];
     if (list.length === 0) return () => {};
@@ -83,11 +102,13 @@ export class BinanceProvider implements DataProvider {
       symbol,
       price: Number(last),
       changePct: Number(open) > 0 ? (Number(last) / Number(open) - 1) * 100 : 0,
+      decimals: this.tickDecimals.get(symbol),
     });
 
-    // A snapshot first, so the list fills at once…
+    // Tick sizes and a snapshot first, so the list fills at once with the right decimals…
     const query = encodeURIComponent(JSON.stringify(list));
-    getJson<MiniTicker[]>(`${REST_URL}/ticker/24hr?type=MINI&symbols=${query}`)
+    this.loadTickDecimals(list)
+      .then(() => getJson<MiniTicker[]>(`${REST_URL}/ticker/24hr?type=MINI&symbols=${query}`))
       .then((rows) => rows.forEach((r) => onQuote(toQuote(r.symbol, r.lastPrice, r.openPrice))))
       .catch(() => {
         /* the stream below still fills it */
@@ -168,4 +189,14 @@ async function getJson<T>(url: string): Promise<T> {
     throw new Error(`Binance: ${detail}`);
   }
   return (await res.json()) as T;
+}
+
+interface ExchangeInfo {
+  symbols?: { symbol: string; filters?: { filterType: string; tickSize?: string }[] }[];
+}
+
+/** Decimals in a step like "0.00100000" (→ 3) or "1.00000000" (→ 0). */
+export function decimalsOf(step: string): number {
+  const frac = step.split('.')[1]?.replace(/0+$/, '') ?? '';
+  return frac.length;
 }

@@ -8,6 +8,9 @@
   --accent: #4f8cff;
   --up: #26a69a;
   --down: #ef5350;
+  /* Gains and losses in the app's own lists, independent of the chart's candle colors. */
+  --gain: #22ab94;
+  --loss: #f7525f;
   --active-bg: linear-gradient(180deg, rgba(79, 140, 255, 0.42), rgba(79, 140, 255, 0.18));
   --active-border: rgba(110, 160, 255, 0.85);
   --active-text: #ffffff;
@@ -25,6 +28,8 @@ body.light {
   --active-bg: linear-gradient(180deg, rgba(79, 140, 255, 0.28), rgba(79, 140, 255, 0.1));
   --active-border: rgba(41, 98, 255, 0.75);
   --active-text: #1d4ed8;
+  --gain: #089981;
+  --loss: #f23645;
   --active-glow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 8px rgba(41, 98, 255, 0.1);
   color-scheme: light;
 }
@@ -137,7 +142,7 @@ button.icon svg {
 }
 
 #status.error {
-  color: var(--down);
+  color: var(--loss);
 }
 
 /* --- symbol search ----------------------------------------------------------- */
@@ -196,11 +201,11 @@ button.icon svg {
 }
 
 .symbol-item .detail.up {
-  color: var(--up);
+  color: var(--gain);
 }
 
 .symbol-item .detail.down {
-  color: var(--down);
+  color: var(--loss);
 }
 
 /* --- layout -------------------------------------------------------------------- */
@@ -247,7 +252,7 @@ button.icon svg {
 }
 
 #sidebar .tool.danger:hover:not(:disabled) {
-  color: var(--down);
+  color: var(--loss);
 }
 
 #sidebar .sep {
@@ -366,7 +371,7 @@ button.icon svg {
 }
 
 .sb-button.danger:hover {
-  color: var(--down);
+  color: var(--loss);
 }
 
 .sb-group select {
@@ -858,7 +863,7 @@ button.link:hover:not(:disabled) {
 
 .alert-tag-remove:hover:not(:disabled) {
   background: var(--hover);
-  color: var(--down);
+  color: var(--loss);
 }
 
 /* ==========================================================================
@@ -1193,7 +1198,7 @@ body.light #timeframes {
 }
 
 .context-item.danger:hover:not(:disabled) {
-  color: var(--down);
+  color: var(--loss);
 }
 
 .context-shortcut {
@@ -1216,9 +1221,11 @@ body.light #timeframes {
 /* --- watchlist ------------------------------------------------------------------- */
 
 #watchlist {
+  position: relative;
   display: flex;
   flex-direction: column;
   width: 260px;
+  min-width: 200px;
   flex-shrink: 0;
   background: var(--panel);
   border-left: 1px solid var(--border);
@@ -1313,11 +1320,45 @@ body.light #timeframes {
 }
 
 .wl-change.up {
-  color: var(--up);
+  color: var(--gain);
 }
 
 .wl-change.down {
-  color: var(--down);
+  color: var(--loss);
+}
+
+/* Grab area on the left edge for resizing; shows a thin accent line on hover. */
+.wl-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 5;
+  touch-action: none;
+  user-select: none;
+}
+
+.wl-resize::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.wl-resize:hover::after,
+#watchlist.resizing .wl-resize::after {
+  opacity: 0.8;
+}
+
+#watchlist.resizing {
+  user-select: none;
 }
 
 .wl-price.flash-up {
@@ -1363,7 +1404,7 @@ body.light #timeframes {
 }
 
 .wl-remove:hover:not(:disabled) {
-  color: var(--down);
+  color: var(--loss);
   background: transparent;
 }
 

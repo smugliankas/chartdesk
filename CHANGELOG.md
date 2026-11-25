@@ -4,7 +4,11 @@
 
 - Watchlist: a panel on the right (list button in the top bar) with live price and 24h change
   for your symbols. Click a row to open it on the chart; add symbols with the search box,
-  remove them with ×. Prices flash green or red when they change. Saved between visits.
+  remove them with ×. Prices use each market's own decimals and flash green or red when they
+  change; the 24h change is always green or red, whatever the candle colors are. Drag the
+  panel's left edge to resize it (double-click to reset). Saved between visits.
+- Red and green in the app (24h change, errors, delete buttons) no longer follow the candle
+  colors, so they stay readable with black-and-white candles.
 - Right-click menu: on a drawing (duplicate, copy, lock, bring to front, send to back, alert,
   delete) and on the empty chart (alert at that price, paste, hide drawings, reset the view,
   remove all drawings).

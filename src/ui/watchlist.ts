@@ -9,6 +9,8 @@ export interface WatchItem {
 interface Saved {
   open: boolean;
   items: WatchItem[];
+  /** Panel width in pixels. */
+  width?: number;
 }
 
 interface Options {
@@ -27,6 +29,9 @@ interface Options {
 }
 
 const KEY = 'chartdesk:watchlist';
+const DEFAULT_WIDTH = 260;
+const MIN_WIDTH = 200;
+const MAX_WIDTH = 560;
 const DEFAULT_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT'];
 
 function load(providerId: string): Saved {
@@ -35,14 +40,22 @@ function load(providerId: string): Saved {
     const raw = localStorage.getItem(KEY);
     if (!raw) return fallback;
     const saved = JSON.parse(raw) as Partial<Saved>;
-    return { open: saved.open ?? true, items: Array.isArray(saved.items) ? saved.items : fallback.items };
+    return {
+      open: saved.open ?? true,
+      items: Array.isArray(saved.items) ? saved.items : fallback.items,
+      width: typeof saved.width === 'number' ? saved.width : undefined,
+    };
   } catch {
     return fallback;
   }
 }
 
-/** Fixed decimals by size, so prices don't jump around as trailing zeros come and go. */
-function formatQuotePrice(p: number): string {
+/**
+ * The market's own decimals when known (from the tick size), otherwise fixed decimals by
+ * size, so prices don't jump around as trailing zeros come and go.
+ */
+function formatQuotePrice(p: number, decimals?: number): string {
+  if (decimals !== undefined) return p.toFixed(decimals);
   if (p >= 1000) return p.toFixed(2);
   if (p >= 1) return p.toFixed(4);
   if (p >= 0.01) return p.toFixed(5);
@@ -66,6 +79,7 @@ export function createWatchlist({ host, toggleButton, providerId, current, onSel
   const panel = document.createElement('aside');
   panel.id = 'watchlist';
   panel.innerHTML = `
+    <div class="wl-resize"></div>
     <div class="wl-header">
       <h3>Watchlist</h3>
       <div class="symbol-box wl-add"><input type="text" spellcheck="false" autocomplete="off" placeholder="Add symbol…" /></div>
@@ -73,6 +87,45 @@ export function createWatchlist({ host, toggleButton, providerId, current, onSel
     <div class="wl-columns"><span>Symbol</span><span>Last</span><span>24h</span></div>
     <div class="wl-rows"></div>`;
   host.append(panel);
+  const resizeEl = panel.querySelector<HTMLDivElement>('.wl-resize')!;
+  const applyWidth = () => {
+    panel.style.width = `${Math.round(state.width ?? DEFAULT_WIDTH)}px`;
+  };
+  applyWidth();
+
+  // Drag the left edge to resize, like TradingView's right panel. Double-click resets it.
+  resizeEl.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    resizeEl.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const startWidth = panel.getBoundingClientRect().width;
+    panel.classList.add('resizing');
+    const move = (ev: PointerEvent) => {
+      const maxWidth = Math.min(MAX_WIDTH, window.innerWidth * 0.6);
+      state.width = Math.max(MIN_WIDTH, Math.min(maxWidth, startWidth + (startX - ev.clientX)));
+      applyWidth();
+    };
+    const up = () => {
+      resizeEl.removeEventListener('pointermove', move);
+      resizeEl.removeEventListener('pointerup', up);
+      resizeEl.removeEventListener('pointercancel', up);
+      panel.classList.remove('resizing');
+      save();
+    };
+    resizeEl.addEventListener('pointermove', move);
+    resizeEl.addEventListener('pointerup', up);
+    resizeEl.addEventListener('pointercancel', up);
+  });
+  // No text selection from (double-)clicking the edge.
+  resizeEl.addEventListener('mousedown', (e) => e.preventDefault());
+  resizeEl.addEventListener('dblclick', () => {
+    window.getSelection()?.removeAllRanges();
+    state.width = undefined;
+    applyWidth();
+    save();
+  });
+
   const rowsEl = panel.querySelector<HTMLDivElement>('.wl-rows')!;
   const addInput = panel.querySelector<HTMLInputElement>('.wl-add input')!;
 
@@ -140,7 +193,7 @@ export function createWatchlist({ host, toggleButton, providerId, current, onSel
     if (!el) return;
     const prev = quotes.get(q.symbol);
     quotes.set(q.symbol, q);
-    el.price.textContent = formatQuotePrice(q.price);
+    el.price.textContent = formatQuotePrice(q.price, q.decimals);
     el.change.textContent = `${q.changePct >= 0 ? '+' : ''}${q.changePct.toFixed(2)}%`;
     el.change.classList.toggle('up', q.changePct >= 0);
     el.change.classList.toggle('down', q.changePct < 0);

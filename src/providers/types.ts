@@ -6,6 +6,8 @@ export interface Quote {
   price: number;
   /** Change over the last 24 hours, in percent. */
   changePct: number;
+  /** Decimals the market quotes this symbol with (from its tick size), when known. */
+  decimals?: number;
 }
 
 /** One entry in the symbol search list. */
