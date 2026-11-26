@@ -51,11 +51,14 @@ your machine.
 | `Alt/⌥` + `T` `H` `J` `V` `C` | Trend line, horizontal line, horizontal ray, vertical line, cross line |
 | `Alt/⌥` + `R` `F` `L` `S` `N` `M` | Rectangle, Fibonacci, long, short, text, measure |
 | `Alt/⌥` + `A` | Alert at the cursor price |
-| Hold `⌘` (Mac) / `Ctrl` | Magnet while held: crosshair and drawing points snap to open/high/low/close |
+| Hold `⌘` (Mac) / `Ctrl` | Magnet while drawing: drawing points snap to open/high/low/close |
+| `⌘/Ctrl` + click | Add a drawing to the selection, or take it out |
+| `⌘/Ctrl` + drag | Select every drawing in an area |
+| `⌘/Ctrl` + `A` | Select all drawings |
 | `Shift` + click | Measure |
 | Hold `Shift` while drawing a line | Horizontal, vertical or 45° |
 | `⌘/Ctrl` + `C` / `V` / `D` | Copy, paste, duplicate the selected drawing |
-| Arrow keys (`Shift` for ×10) | Move the selected drawing |
+| Arrow keys (`Shift` for ×10) | Move the selected drawings |
 | Right-click | Drawing or chart menu |
 | `⌥⌘S` / `Ctrl` + `Alt` + `S` | Download chart image |
 | `⇧⌘S` / `Ctrl` + `Shift` + `S` | Copy chart image |
@@ -64,7 +67,7 @@ your machine.
 | `⇧A` / `Shift` + `A` | Auto-fit the price scale on / off |
 | `Space` | Replay: play / pause |
 | `⇧→` / `Shift` + `→` | Replay: next bar |
-| `Del` / `Backspace` | Delete selected drawing |
+| `Del` / `Backspace` | Delete the selected drawings |
 | `⌘/Ctrl` + `Z`, `⌘/Ctrl` + `Shift` + `Z` | Undo, redo |
 | Double-click a text note | Edit it |
 
@@ -124,7 +127,8 @@ Apple Silicon and Intel; an `.msi` or `.exe` for Windows).
 
 The builds are not signed yet, so the system warns the first time you open them:
 
-- **macOS:** right-click ChartDesk in Applications and choose **Open**, then **Open** again.
+- **macOS:** open ChartDesk once and close the warning. Then go to **System Settings →
+  Privacy & Security**, scroll down to "ChartDesk was blocked" and click **Open Anyway**.
   If macOS says the app "is damaged", run `xattr -dr com.apple.quarantine /Applications/ChartDesk.app`
   in Terminal once.
 - **Windows:** on "Windows protected your PC", click **More info**, then **Run anyway**.

@@ -83,7 +83,7 @@ export function createDrawingsList({ drawings, formatPrice, symbol }: Options): 
       const row = document.createElement('div');
       row.className =
         'dl-row' +
-        (d.id === drawings.selectedId ? ' current' : '') +
+        (drawings.isSelected(d.id) ? ' current' : '') +
         (d.hidden || offTimeframe ? ' is-hidden' : '') +
         (d.locked ? ' is-locked' : '');
       if (offTimeframe && drawings.timeframe) {

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Select several drawings at once, like TradingView: ⌘/Ctrl + click adds a drawing to the
+  selection (or takes it out), ⌘/Ctrl + drag selects every drawing in an area, ⌘/Ctrl + A
+  selects them all. Delete removes them, dragging one moves them all, the arrow keys move
+  them, and one undo brings them back.
 - Desktop app for macOS and Windows (Tauri): the same app in its own window. Full screen is
   the window's own; chart images and backups are saved through a real "Save as" dialog; links
   open in your browser. Installers are built on GitHub (Actions → Desktop app), not signed yet.

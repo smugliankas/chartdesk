@@ -151,7 +151,7 @@ function syncReplay(): void {
 window.addEventListener('keydown', (e) => {
   const target = e.target as HTMLElement | null;
   if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) return;
-  if (!replay.active || drawings.selectedId || !e.shiftKey || e.key !== 'ArrowRight' || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (!replay.active || drawings.selectedIds.length || !e.shiftKey || e.key !== 'ArrowRight' || e.metaKey || e.ctrlKey || e.altKey) return;
   e.preventDefault();
   replay.pause();
   replay.step();
@@ -674,12 +674,26 @@ drawings.onToolChange((tool) => {
   showInGroup(tool);
   for (const x of toolGroups) x.button.classList.toggle('active', x.current === tool);
 });
+// Several drawings selected (⌘/Ctrl): the status line says how many and what can be done.
+let selectionNote: string | null = null;
+function syncSelectionNote(): void {
+  const n = drawings.selectedIds.length;
+  if (n > 1) {
+    selectionNote = `${n} drawings selected · drag one to move them all, ${IS_MAC ? 'Delete' : 'Del'} removes them`;
+    setStatus(selectionNote);
+  } else if (selectionNote) {
+    if (statusEl.textContent === selectionNote) showReadyStatus();
+    selectionNote = null;
+  }
+}
+
 drawings.onChange(() => {
   syncLineAlerts();
   syncStyleBar();
   undoButton.disabled = !drawings.canUndo;
   redoButton.disabled = !drawings.canRedo;
-  deleteButton.disabled = !drawings.selectedId;
+  deleteButton.disabled = drawings.selectedIds.length === 0;
+  syncSelectionNote();
   hideButton.innerHTML = drawings.hidden ? ICONS.eyeOff : ICONS.eye;
   hideButton.classList.toggle('active', drawings.hidden);
   hideButton.dataset.tip = drawings.hidden ? 'Show drawings' : 'Hide all drawings';
@@ -1077,10 +1091,13 @@ const shortcuts: [string, string][] = [
   ...TOOLS.filter((t) => t.key).map((t) => [`${ALT}${t.key!.replace('Key', '')}`, t.title] as [string, string]),
   ['Shift + click', 'Measure'],
   [`${ALT}A`, 'Alert at the cursor price'],
-  [`Hold ${HOLD}`, 'Magnet while held (snap to open/high/low/close)'],
+  [`Hold ${HOLD}`, 'Magnet while drawing (snap to open/high/low/close)'],
+  [`${HOLD} + click`, 'Add a drawing to the selection, or take it out'],
+  [`${HOLD} + drag`, 'Select the drawings in an area'],
+  [`${MOD}A`, 'Select all drawings'],
   ['Shift while drawing', 'Keep a line horizontal, vertical or at 45°'],
   [`${MOD}C / ${MOD}V / ${MOD}D`, 'Copy, paste, duplicate drawing'],
-  ['Arrow keys', 'Move the selected drawing (Shift: faster)'],
+  ['Arrow keys', 'Move the selected drawings (Shift: faster)'],
   ['Right-click', 'Drawing and chart menu'],
   [REPLAY_STEP_KEYS, 'Replay: next bar'],
   ['Space', 'Replay: play / pause'],
@@ -1089,7 +1106,7 @@ const shortcuts: [string, string][] = [
   ['Esc', 'Cursor / cancel; in full screen, exits when there is nothing to cancel'],
   [FULLSCREEN_KEYS, 'Full screen'],
   [AUTO_SCALE_KEYS, 'Auto-fit the price scale on / off'],
-  ['Del', 'Delete selected drawing'],
+  ['Del', 'Delete the selected drawings'],
   [`${MOD}Z`, 'Undo'],
   [`${MOD}⇧Z`, 'Redo'],
   ['Double-click text', 'Edit text'],

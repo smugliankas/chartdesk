@@ -2,7 +2,7 @@ import { readable } from '../chart/appearance';
 import type { ChartController } from '../chart/ChartController';
 import { modifierHeld } from '../platform';
 import { DrawingsPrimitive, type DrawingSource } from './DrawingsPrimitive';
-import { distToPolyline, distToSegment, extendSegment, handlesOf, insideChannel, moveHandle, moveWhole, type Part } from './geometry';
+import { distToPolyline, distToSegment, extendSegment, handlesOf, insideChannel, moveHandle, moveWhole, segmentCrossesRect, type Part } from './geometry';
 import {
   DEFAULT_COLORS,
   DEFAULT_FONT_SIZE,
@@ -37,9 +37,19 @@ interface DragState {
   id: string;
   part: Part;
   original: Drawing;
+  /** Moving several selected drawings at once: the others, as they were when the drag began. */
+  others?: Drawing[];
   startLogical: number;
   startPrice: number;
   before: Drawing[];
+}
+
+/** Rectangle dragged out with ⌘/Ctrl to select the drawings it touches (pane pixels). */
+export interface SelectBox {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
 }
 
 const HANDLE_RADIUS = 8;
@@ -56,7 +66,14 @@ const HISTORY_LIMIT = 200;
 export class DrawingManager implements DrawingSource {
   drawings: Drawing[] = [];
   preview: Drawing | null = null;
-  selectedId: string | null = null;
+  /**
+   * The selected drawings. Usually one; several after ⌘/Ctrl+click or a ⌘/Ctrl box.
+   * `selectedId` is the one selected drawing (null when none or several), and setting it
+   * replaces the whole selection.
+   */
+  private sel: string[] = [];
+  /** Box being dragged out with ⌘/Ctrl to select drawings. */
+  selectBox: SelectBox | null = null;
   editingId: string | null = null;
   measure: { p1: Point; p2: Point } | null = null;
   hidden = false;
@@ -157,6 +174,31 @@ export class DrawingManager implements DrawingSource {
     return this.redoStack.length > 0;
   }
 
+  get selectedId(): string | null {
+    return this.sel.length === 1 ? this.sel[0] : null;
+  }
+
+  set selectedId(id: string | null) {
+    this.sel = id ? [id] : [];
+  }
+
+  /** All selected drawings' ids (one or more), in the order they were selected. */
+  get selectedIds(): readonly string[] {
+    return this.sel;
+  }
+
+  isSelected(id: string): boolean {
+    return this.sel.includes(id);
+  }
+
+  /** Keeps only the selected drawings that still exist and show on this timeframe. */
+  private pruneSelection(): void {
+    this.sel = this.sel.filter((id) => {
+      const d = this.drawings.find((x) => x.id === id);
+      return d && !d.hidden && shownOn(d, this.timeframe);
+    });
+  }
+
   get selectedDrawing(): Drawing | null {
     return this.drawings.find((d) => d.id === this.selectedId) ?? null;
   }
@@ -251,14 +293,14 @@ export class DrawingManager implements DrawingSource {
 
   /** Runs `fn` with nothing shown as selected and no measurement, e.g. for a chart image. */
   whileUnselected<T>(fn: () => T): T {
-    const selected = this.selectedId;
+    const selected = this.sel;
     const measure = this.measure;
-    this.selectedId = null;
+    this.sel = [];
     this.measure = null;
     try {
       return fn();
     } finally {
-      this.selectedId = selected;
+      this.sel = selected;
       this.measure = measure;
     }
   }
@@ -274,7 +316,7 @@ export class DrawingManager implements DrawingSource {
   get hasEscapable(): boolean {
     return (
       this.tool !== 'cursor' ||
-      this.selectedId !== null ||
+      this.sel.length > 0 ||
       this.measure !== null ||
       this.pending !== null ||
       this.channelBase !== null ||
@@ -324,8 +366,7 @@ export class DrawingManager implements DrawingSource {
   setTimeframe(tf: Timeframe): void {
     if (this.timeframe === tf) return;
     this.timeframe = tf;
-    const d = this.selectedDrawing;
-    if (d && !shownOn(d, tf)) this.selectedId = null;
+    this.pruneSelection();
     this.changed();
   }
 
@@ -354,7 +395,7 @@ export class DrawingManager implements DrawingSource {
   toggleVisibility(id: string): void {
     this.mutate(() => {
       this.drawings = this.drawings.map((d) => (d.id === id ? { ...d, hidden: !d.hidden } : d));
-      if (this.selectedId === id && this.drawings.find((d) => d.id === id)?.hidden) this.selectedId = null;
+      this.pruneSelection();
     });
   }
 
@@ -371,7 +412,7 @@ export class DrawingManager implements DrawingSource {
     if (!this.drawings.some((d) => d.id === id)) return;
     this.mutate(() => {
       this.drawings = this.drawings.filter((d) => d.id !== id);
-      if (this.selectedId === id) this.selectedId = null;
+      this.pruneSelection();
     });
   }
 
@@ -396,10 +437,10 @@ export class DrawingManager implements DrawingSource {
     return this.selectedDrawing;
   }
 
-  /** Moves the selected drawing by whole bars and/or screen pixels (arrow keys). */
+  /** Moves the selected drawings by whole bars and/or screen pixels (arrow keys). */
   nudge(bars: number, pixels: number): void {
-    const d = this.selectedDrawing;
-    if (!d || d.locked) return;
+    const moving = this.drawings.filter((d) => this.sel.includes(d.id) && !d.locked);
+    if (moving.length === 0) return;
     const y0 = this.cc.priceToY(0) ?? 0;
     const p0 = this.cc.yToPrice(y0);
     const p1 = this.cc.yToPrice(y0 - pixels);
@@ -412,18 +453,20 @@ export class DrawingManager implements DrawingSource {
       this.nudgeBefore = null;
       this.changed();
     }, 600);
-    const moved = moveWhole(d, (t) => this.cc.logicalToTime(this.cc.timeToLogical(t) + bars), dPrice);
-    this.drawings = this.drawings.map((x) => (x.id === d.id ? moved : x));
+    const shift = (t: number) => this.cc.logicalToTime(this.cc.timeToLogical(t) + bars);
+    const moved = new Map(moving.map((d) => [d.id, moveWhole(d, shift, dPrice)]));
+    this.drawings = this.drawings.map((x) => moved.get(x.id) ?? x);
     this.save();
     this.changed();
   }
 
+  /** Deletes the selected drawings (one or several) as one undo step. */
   deleteSelected(): void {
-    const id = this.selectedId;
-    if (!id) return;
+    if (this.sel.length === 0) return;
+    const ids = new Set(this.sel);
     this.mutate(() => {
-      this.drawings = this.drawings.filter((d) => d.id !== id);
-      this.selectedId = null;
+      this.drawings = this.drawings.filter((d) => !ids.has(d.id));
+      this.sel = [];
     });
   }
 
@@ -477,7 +520,7 @@ export class DrawingManager implements DrawingSource {
 
   private restore(drawings: Drawing[]): void {
     this.drawings = drawings;
-    if (this.selectedId && !drawings.some((d) => d.id === this.selectedId)) this.selectedId = null;
+    this.pruneSelection();
     this.save();
     this.changed();
   }
@@ -716,9 +759,9 @@ export class DrawingManager implements DrawingSource {
 
   private hitTest(x: number, y: number): { id: string; part: Part } | null {
     if (this.hidden) return null;
-    // Selected drawing first, so its handles win over drawings underneath.
+    // Selected drawings first, so their handles win over drawings underneath.
     const w = this.primitive.viewWindow();
-    const order = this.drawings.filter((d) => !d.hidden && shownOn(d, this.timeframe) && (d.id === this.selectedId || !w || this.primitive.inView(d, w))).reverse().sort((a, b) => Number(b.id === this.selectedId) - Number(a.id === this.selectedId));
+    const order = this.drawings.filter((d) => !d.hidden && shownOn(d, this.timeframe) && (this.sel.includes(d.id) || !w || this.primitive.inView(d, w))).reverse().sort((a, b) => Number(this.sel.includes(b.id)) - Number(this.sel.includes(a.id)));
     for (const d of order) {
       for (const h of d.locked ? [] : handlesOf(d)) {
         const p = this.xy(h.point);
@@ -891,9 +934,27 @@ export class DrawingManager implements DrawingSource {
 
     // Cursor: select / start dragging, or let the chart pan.
     const hit = this.hitTest(x, y);
+
+    // ⌘/Ctrl, like TradingView: a click adds a drawing to the selection or takes it out; a drag
+    // over empty space draws a box and selects every drawing it touches.
+    if (modifierHeld(e)) {
+      e.stopPropagation();
+      e.preventDefault();
+      if (hit) {
+        this.sel = this.sel.includes(hit.id) ? this.sel.filter((id) => id !== hit.id) : [...this.sel, hit.id];
+        this.changed();
+      } else {
+        this.selectBox = { x1: x, y1: y, x2: x, y2: y };
+        window.addEventListener('mousemove', this.onBoxMove);
+        window.addEventListener('mouseup', this.onBoxEnd);
+        this.redraw();
+      }
+      return;
+    }
+
     if (!hit) {
-      if (this.selectedId) {
-        this.selectedId = null;
+      if (this.sel.length) {
+        this.sel = [];
         this.changed();
       }
       return;
@@ -901,15 +962,18 @@ export class DrawingManager implements DrawingSource {
 
     e.stopPropagation();
     e.preventDefault();
-    this.selectedId = hit.id;
+    // Grabbing one of several selected drawings moves them all; anything else selects just it.
+    const group = this.sel.length > 1 && this.sel.includes(hit.id);
+    if (!group) this.selectedId = hit.id;
     const original = this.drawings.find((d) => d.id === hit.id);
     const logical = this.cc.xToLogical(x);
     const price = this.cc.yToPrice(y);
-    if (original && !original.locked && logical !== null && price !== null) {
+    if (original && (group || !original.locked) && logical !== null && price !== null) {
       this.drag = {
         id: hit.id,
-        part: hit.part,
+        part: group ? 'body' : hit.part,
         original: structuredClone(original),
+        others: group ? this.drawings.filter((d) => d.id !== hit.id && this.sel.includes(d.id)) : undefined,
         startLogical: Math.round(logical),
         startPrice: price,
         before: this.snapshot(),
@@ -986,6 +1050,14 @@ export class DrawingManager implements DrawingSource {
       if (logicalRaw === null || price === null) return;
       const dl = Math.round(logicalRaw) - drag.startLogical;
       const shiftTime = (t: number) => this.cc.logicalToTime(this.cc.timeToLogical(t) + dl);
+      if (drag.others) {
+        // Several drawings: all move by the same amount (locked ones stay).
+        const all = [drag.original, ...drag.others].filter((d) => !d.locked);
+        const moved = new Map(all.map((d) => [d.id, moveWhole(d, shiftTime, price - drag.startPrice)]));
+        this.drawings = this.drawings.map((d) => moved.get(d.id) ?? d);
+        this.redraw();
+        return;
+      }
       next = moveWhole(drag.original, shiftTime, price - drag.startPrice);
     } else {
       const o = drag.original;
@@ -1015,9 +1087,110 @@ export class DrawingManager implements DrawingSource {
     if (drag && JSON.stringify(drag.before) !== JSON.stringify(this.drawings)) {
       this.pushHistory(drag.before);
       this.save();
+    } else if (drag?.others) {
+      // A click (no move) on one of several selected drawings selects just that one.
+      this.selectedId = drag.id;
     }
     this.changed();
   };
+
+  private onBoxMove = (e: MouseEvent): void => {
+    if (!this.selectBox) return;
+    const { x, y } = this.local(e);
+    this.selectBox = { ...this.selectBox, x2: x, y2: y };
+    this.redraw();
+  };
+
+  private onBoxEnd = (): void => {
+    window.removeEventListener('mousemove', this.onBoxMove);
+    window.removeEventListener('mouseup', this.onBoxEnd);
+    const b = this.selectBox;
+    this.selectBox = null;
+    if (!b) return;
+    const box = { left: Math.min(b.x1, b.x2), right: Math.max(b.x1, b.x2), top: Math.min(b.y1, b.y2), bottom: Math.max(b.y1, b.y2) };
+    // A ⌘/Ctrl click on empty space (no real box) clears the selection.
+    if (box.right - box.left < 3 && box.bottom - box.top < 3) this.sel = [];
+    else this.sel = this.drawings.filter((d) => this.isShown(d) && this.touchesBox(d, box)).map((d) => d.id);
+    this.changed();
+  };
+
+  /** Whether any part of a drawing lies inside the box (pane pixels). */
+  private touchesBox(d: Drawing, box: { left: number; right: number; top: number; bottom: number }): boolean {
+    const { left, right, top, bottom } = box;
+    const pane = this.cc.paneSize();
+    const xIn = (x: number) => x >= left && x <= right;
+    const yIn = (y: number) => y >= top && y <= bottom;
+    const seg = (a: { x: number; y: number }, c: { x: number; y: number }) => segmentCrossesRect(a.x, a.y, c.x, c.y, left, top, right, bottom);
+    const boxOverlap = (x1: number, y1: number, x2: number, y2: number) =>
+      Math.max(x1, x2) >= left && Math.min(x1, x2) <= right && Math.max(y1, y2) >= top && Math.min(y1, y2) <= bottom;
+    const X = (t: number) => this.cc.timeToX(t);
+    const Y = (p: number) => this.cc.priceToY(p);
+
+    switch (d.type) {
+      case 'hline': {
+        const y = Y(d.price);
+        return y !== null && yIn(y);
+      }
+      case 'vline': {
+        const x = X(d.time);
+        return x !== null && xIn(x);
+      }
+      case 'hray': {
+        const p = this.xy(d.p);
+        return !!p && yIn(p.y) && p.x <= right;
+      }
+      case 'cross': {
+        const p = this.xy(d.p);
+        return !!p && (yIn(p.y) || xIn(p.x));
+      }
+      case 'trend':
+      case 'arrow': {
+        const a = this.xy(d.p1);
+        const c = this.xy(d.p2);
+        return !!a && !!c && seg(a, c);
+      }
+      case 'ray':
+      case 'extended': {
+        const a = this.xy(d.p1);
+        const c = this.xy(d.p2);
+        if (!a || !c) return false;
+        const [x1, y1, x2, y2] = extendSegment(a.x, a.y, c.x, c.y, (pane.width + pane.height) * 4, d.type === 'extended');
+        return segmentCrossesRect(x1, y1, x2, y2, left, top, right, bottom);
+      }
+      case 'channel': {
+        const a = this.xy(d.p1);
+        const c = this.xy(d.p2);
+        const a2 = this.xy({ time: d.p1.time, price: d.p1.price + d.offset });
+        const c2 = this.xy({ time: d.p2.time, price: d.p2.price + d.offset });
+        if (!a || !c || !a2 || !c2) return false;
+        return seg(a, c) || seg(a2, c2) || insideChannel((left + right) / 2, (top + bottom) / 2, a, c, a2.y - a.y);
+      }
+      case 'brush': {
+        const pts = d.points.map((p) => this.xy(p)).filter((p): p is { x: number; y: number } => p !== null);
+        return pts.some((p, i) => (i === 0 ? xIn(p.x) && yIn(p.y) : seg(pts[i - 1], p)));
+      }
+      case 'text': {
+        const p = this.xy(d.p);
+        if (!p) return false;
+        const size = measureText(d.text, d.fontSize ?? DEFAULT_FONT_SIZE);
+        return boxOverlap(p.x, p.y, p.x + size.width, p.y + size.height);
+      }
+      case 'long':
+      case 'short': {
+        const x1 = X(d.entry.time);
+        const x2 = X(d.endTime);
+        const y1 = Y(d.tp);
+        const y2 = Y(d.sl);
+        return x1 !== null && x2 !== null && y1 !== null && y2 !== null && boxOverlap(x1, y1, x2, y2);
+      }
+      default: {
+        // Rectangle, Fibonacci, price and date ranges: the area between their two points.
+        const a = this.xy(d.p1);
+        const c = this.xy(d.p2);
+        return !!a && !!c && boxOverlap(a.x, a.y, c.x, c.y);
+      }
+    }
+  }
 
   // --- keyboard ---------------------------------------------------------------------
 
@@ -1036,13 +1209,18 @@ export class DrawingManager implements DrawingSource {
     } else if (mod && e.code === 'KeyC' && this.selectedId) {
       e.preventDefault();
       this.copySelected();
+    } else if (mod && e.code === 'KeyA' && !e.shiftKey && !e.altKey) {
+      // Select every drawing on the chart (instead of the page's text).
+      e.preventDefault();
+      this.sel = this.drawings.filter((d) => this.isShown(d)).map((d) => d.id);
+      this.changed();
     } else if (mod && e.code === 'KeyV' && this.clipboard) {
       e.preventDefault();
       this.paste();
     } else if (mod && e.code === 'KeyD' && this.selectedId) {
       e.preventDefault(); // also stops the browser's "bookmark this page"
       this.duplicateSelected();
-    } else if (this.selectedId && !mod && e.key.startsWith('Arrow')) {
+    } else if (this.sel.length && !mod && e.key.startsWith('Arrow')) {
       e.preventDefault();
       const big = e.shiftKey;
       if (e.key === 'ArrowLeft') this.nudge(big ? -10 : -1, 0);
@@ -1051,9 +1229,9 @@ export class DrawingManager implements DrawingSource {
       else if (e.key === 'ArrowDown') this.nudge(0, big ? -10 : -1);
     } else if (e.key === 'Escape') {
       this.measure = null;
-      this.selectedId = null;
+      this.sel = [];
       this.setTool('cursor');
-    } else if ((e.key === 'Delete' || e.key === 'Backspace') && this.selectedId) {
+    } else if ((e.key === 'Delete' || e.key === 'Backspace') && this.sel.length) {
       e.preventDefault();
       this.deleteSelected();
     }

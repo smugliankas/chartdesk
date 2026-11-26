@@ -9,7 +9,7 @@ import type {
 import { labelTextColor, readable } from '../chart/appearance';
 import type { ChartController } from '../chart/ChartController';
 import type { Timeframe } from '../types';
-import { extendSegment, handlesOf } from './geometry';
+import { extendSegment, handlesOf, segmentCrossesRect } from './geometry';
 import {
   DEFAULT_FONT_SIZE,
   DEFAULT_WIDTH,
@@ -37,7 +37,9 @@ type RenderTarget = Parameters<IPrimitivePaneRenderer['draw']>[0];
 export interface DrawingSource {
   readonly drawings: readonly Drawing[];
   readonly preview: Drawing | null;
-  readonly selectedId: string | null;
+  readonly selectedIds: readonly string[];
+  /** Box being dragged out with ⌘/Ctrl to select drawings (pane pixels). */
+  readonly selectBox: { x1: number; y1: number; x2: number; y2: number } | null;
   /** Hidden while the text is being edited in place. */
   readonly editingId: string | null;
   /** All drawings hidden ("hide drawings" toggle). */
@@ -222,19 +224,20 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
 
   private draw(target: RenderTarget): void {
     target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
-      const { drawings, preview, selectedId, editingId, measure, hidden, timeframe } = this.source;
+      const { drawings, preview, selectedIds, editingId, measure, hidden, timeframe, selectBox } = this.source;
       const size = { w: mediaSize.width, h: mediaSize.height };
       const w = this.viewWindow();
       if (!hidden) {
         for (const d of drawings) {
           if (d.id === editingId || d.hidden || !shownOn(d, timeframe)) continue;
-          const selected = d.id === selectedId;
+          const selected = selectedIds.includes(d.id);
           if (!selected && w && !this.inView(d, w)) continue;
           this.drawOne(ctx, size, d, selected);
         }
       }
       if (preview) this.drawOne(ctx, size, preview, true);
       if (measure) this.drawMeasure(ctx, measure.p1, measure.p2);
+      if (selectBox) drawSelectBox(ctx, selectBox);
     });
   }
 
@@ -574,30 +577,6 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
 
 // --- canvas helpers ------------------------------------------------------------------
 
-/** Whether the segment (x1,y1)→(x2,y2) touches the rectangle (Liang–Barsky clipping). */
-function segmentCrossesRect(x1: number, y1: number, x2: number, y2: number, left: number, top: number, right: number, bottom: number): boolean {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  let t0 = 0;
-  let t1 = 1;
-  const edges: [number, number][] = [
-    [-dx, x1 - left],
-    [dx, right - x1],
-    [-dy, y1 - top],
-    [dy, bottom - y1],
-  ];
-  for (const [p, q] of edges) {
-    if (p === 0) {
-      if (q < 0) return false;
-      continue;
-    }
-    const r = q / p;
-    if (p < 0) t0 = Math.max(t0, r);
-    else t1 = Math.min(t1, r);
-    if (t0 > t1) return false;
-  }
-  return true;
-}
 
 /** Undoes the state changes a drawing may leave behind. */
 /** The glow around a selected drawing: its color, slightly see-through. */
@@ -684,4 +663,19 @@ function label(
   ctx.textBaseline = 'top';
   lines.forEach((l, i) => ctx.fillText(l, cx, top + 4 + i * lh));
   ctx.restore();
+}
+
+/** The ⌘/Ctrl selection box: a faint fill with a dashed accent outline. */
+function drawSelectBox(ctx: CanvasRenderingContext2D, b: { x1: number; y1: number; x2: number; y2: number }): void {
+  const x = Math.min(b.x1, b.x2);
+  const y = Math.min(b.y1, b.y2);
+  const w = Math.abs(b.x2 - b.x1);
+  const h = Math.abs(b.y2 - b.y1);
+  ctx.fillStyle = 'rgba(79, 140, 255, 0.08)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = 'rgba(79, 140, 255, 0.85)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  ctx.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5, Math.round(w), Math.round(h));
+  ctx.setLineDash([]);
 }

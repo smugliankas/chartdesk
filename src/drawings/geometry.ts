@@ -182,3 +182,28 @@ export function insideChannel(
   const base = a.x === b.x ? a.y : a.y + ((b.y - a.y) * (px - a.x)) / (b.x - a.x);
   return py >= Math.min(base, base + dy) && py <= Math.max(base, base + dy);
 }
+
+/** Whether the segment (x1,y1)→(x2,y2) touches the rectangle (Liang–Barsky clipping). */
+export function segmentCrossesRect(x1: number, y1: number, x2: number, y2: number, left: number, top: number, right: number, bottom: number): boolean {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  let t0 = 0;
+  let t1 = 1;
+  const edges: [number, number][] = [
+    [-dx, x1 - left],
+    [dx, right - x1],
+    [-dy, y1 - top],
+    [dy, bottom - y1],
+  ];
+  for (const [p, q] of edges) {
+    if (p === 0) {
+      if (q < 0) return false;
+      continue;
+    }
+    const r = q / p;
+    if (p < 0) t0 = Math.max(t0, r);
+    else t1 = Math.min(t1, r);
+    if (t0 > t1) return false;
+  }
+  return true;
+}
