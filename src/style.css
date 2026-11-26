@@ -424,6 +424,11 @@ button.icon svg {
   border: 1px solid var(--muted);
 }
 
+/* Box border color: a hollow square. */
+.swatch.ring {
+  border-width: 3px;
+}
+
 .palette {
   position: absolute;
   top: calc(100% + 8px);

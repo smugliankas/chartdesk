@@ -64,7 +64,7 @@ const TIMEFRAMES_ICON =
   '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg>';
 
 /** Which color the palette is currently picking. */
-type ColorTarget = 'color' | 'profitColor' | 'lossColor';
+type ColorTarget = 'color' | 'fillColor' | 'profitColor' | 'lossColor';
 
 export interface LineAlertHooks {
   /** Whether alerts can be set on this kind of drawing. */
@@ -113,7 +113,14 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
   bar.append(palette);
   let paletteTarget: ColorTarget = 'color';
 
-  const setColor = (color: string, live = false) => drawings.setStyle({ [paletteTarget]: color } as DrawingStyle, live);
+  const setColor = (color: string, live = false) => {
+    const d = drawings.selectedDrawing;
+    const patch: DrawingStyle = { [paletteTarget]: color };
+    // A box whose inside still follows its border: keep the inside as it is, so the border
+    // can get its own color.
+    if (paletteTarget === 'color' && d && styleSupport(d.type).fill && !fillOf(d)) patch.fillColor = d.color;
+    drawings.setStyle(patch, live);
+  };
 
   for (const c of PALETTE) {
     const s = document.createElement('button');
@@ -140,6 +147,7 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     const d = drawings.selectedDrawing;
     if (!d) return '#000000';
     if (target === 'color') return d.color;
+    if (target === 'fillColor') return fillOf(d) ?? d.color;
     if (d.type !== 'long' && d.type !== 'short') return d.color;
     return target === 'profitColor' ? (d.profitColor ?? DEFAULT_PROFIT_COLOR) : (d.lossColor ?? DEFAULT_LOSS_COLOR);
   };
@@ -158,6 +166,8 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
   // --- color --------------------------------------------------------------
   const colorGroup = group();
   const lineColor = swatchButton(colorGroup, 'Color', 'color');
+  const fillColor = swatchButton(colorGroup, 'Fill color', 'fillColor');
+  fillColor.swatch.classList.add('fill');
 
   // --- position zones ---------------------------------------------------------
   const zoneGroup = group();
@@ -341,7 +351,7 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
       sample.style.borderColor = color;
       sample.style.borderStyle = t.style.lineStyle ?? 'solid';
       sample.style.borderWidth = `${Math.max(isBox ? 1.5 : 2, t.style.width ?? DEFAULT_WIDTH)}px`;
-      if (isBox) sample.style.background = withAlpha(color, 0.18);
+      if (isBox) sample.style.background = withAlpha(t.style.fillColor ?? color, 0.18);
       const name = document.createElement('span');
       name.textContent = t.name;
       apply.append(sample, name);
@@ -517,7 +527,15 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
       p.button.classList.toggle('active', same);
     }
 
-    lineColor.swatch.style.background = d.color;
+    // Boxes: a border swatch (a hollow square) and a fill swatch beside it.
+    lineColor.swatch.classList.toggle('ring', support.fill);
+    lineColor.swatch.style.background = support.fill ? 'transparent' : d.color;
+    lineColor.swatch.style.borderColor = support.fill ? d.color : '';
+    lineColor.button.dataset.tip = support.fill ? 'Border color' : 'Color';
+    lineColor.button.removeAttribute('title');
+    fillColor.button.classList.toggle('hidden', !support.fill);
+    fillColor.swatch.style.background = withAlpha(currentColor('fillColor'), 0.55);
+    fillColor.swatch.style.borderColor = currentColor('fillColor');
     profitColor.swatch.style.background = currentColor('profitColor');
     lossColor.swatch.style.background = currentColor('lossColor');
     const width = d.width ?? DEFAULT_WIDTH;
@@ -542,4 +560,9 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
       trendBox.checked = fibShowsTrendLine(d);
     }
   };
+}
+
+/** The inside color a box has of its own, if any. */
+function fillOf(d: Drawing): string | undefined {
+  return d.type === 'rect' || d.type === 'channel' ? d.fillColor : undefined;
 }

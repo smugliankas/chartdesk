@@ -313,6 +313,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         const b2 = this.xy({ time: d.p2.time, price: d.p2.price + d.offset });
         if (!a || !b || !a2 || !b2) break;
         ctx.globalAlpha = 0.1;
+        if (d.fillColor) ctx.fillStyle = d.fillColor;
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
@@ -320,6 +321,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         ctx.lineTo(a2.x, a2.y);
         ctx.closePath();
         ctx.fill();
+        ctx.fillStyle = color;
         ctx.globalAlpha = 1;
         line(ctx, a.x, a.y, b.x, b.y);
         line(ctx, a2.x, a2.y, b2.x, b2.y);
@@ -376,7 +378,9 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         const w = Math.abs(b.x - a.x);
         const h = Math.abs(b.y - a.y);
         ctx.globalAlpha = 0.15;
+        if (d.fillColor) ctx.fillStyle = d.fillColor;
         ctx.fillRect(x, y, w, h);
+        ctx.fillStyle = color;
         ctx.globalAlpha = 1;
         ctx.strokeRect(x, y, w, h);
         break;

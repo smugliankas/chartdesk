@@ -56,7 +56,8 @@ export type TrendLine = Base & { type: 'trend'; p1: Point; p2: Point };
 export type Ray = Base & { type: 'ray'; p1: Point; p2: Point };
 /** Passes through p1 and p2 and continues in both directions. */
 export type ExtendedLine = Base & { type: 'extended'; p1: Point; p2: Point };
-export type Rectangle = Base & { type: 'rect'; p1: Point; p2: Point };
+/** `fillColor`: the inside; without one the inside follows the border color. */
+export type Rectangle = Base & { type: 'rect'; p1: Point; p2: Point; fillColor?: string };
 /** `levels`: the levels shown (all when missing). `trendLine`: the dashed diagonal (shown unless false). */
 export type FibRetracement = Base & { type: 'fib'; p1: Point; p2: Point; levels?: number[]; trendLine?: boolean };
 export type HorizontalLine = Base & { type: 'hline'; price: number };
@@ -67,7 +68,7 @@ export type CrossLine = Base & { type: 'cross'; p: Point };
 /** A trend line with an arrowhead at p2. */
 export type Arrow = Base & { type: 'arrow'; p1: Point; p2: Point };
 /** Base line p1→p2 and a parallel line `offset` above it (below when negative), with a dashed middle line. */
-export type ParallelChannel = Base & { type: 'channel'; p1: Point; p2: Point; offset: number };
+export type ParallelChannel = Base & { type: 'channel'; p1: Point; p2: Point; offset: number; fillColor?: string };
 /** Measures the price distance from p1 to p2. */
 export type PriceRange = Base & { type: 'pricerange'; p1: Point; p2: Point };
 /** Measures the time (bars) from p1 to p2. */
@@ -162,6 +163,8 @@ export interface DrawingStyle {
   fontSize?: number;
   profitColor?: string;
   lossColor?: string;
+  /** Inside color of boxes (rectangle, channel). */
+  fillColor?: string;
   levels?: number[];
   trendLine?: boolean;
   label?: string;
@@ -196,6 +199,8 @@ export interface StyleSupport {
   font: boolean;
   /** Target/stop zone colors (positions). */
   zones: boolean;
+  /** Separate border and inside colors (rectangle, channel). */
+  fill: boolean;
   /** Level toggles and trend line (Fibonacci). */
   fib: boolean;
   /** Text on the drawing, with a position. */
@@ -207,19 +212,22 @@ export function styleSupport(type: DrawingType): StyleSupport {
   switch (type) {
     case 'long':
     case 'short':
-      return { color: false, line: false, font: false, zones: true, fib: false, label: false };
+      return { color: false, line: false, font: false, zones: true, fill: false, fib: false, label: false };
     case 'text':
-      return { color: true, line: false, font: true, zones: false, fib: false, label: false };
+      return { color: true, line: false, font: true, zones: false, fill: false, fib: false, label: false };
     case 'fib':
-      return { color: true, line: true, font: false, zones: false, fib: true, label: false };
+      return { color: true, line: true, font: false, zones: false, fill: false, fib: true, label: false };
     case 'pricerange':
     case 'daterange':
-      return { color: true, line: false, font: false, zones: false, fib: false, label: false };
+      return { color: true, line: false, font: false, zones: false, fill: false, fib: false, label: false };
     case 'brush':
-      return { color: true, line: true, font: false, zones: false, fib: false, label: false };
+      return { color: true, line: true, font: false, zones: false, fill: false, fib: false, label: false };
+    case 'rect':
+    case 'channel':
+      return { color: true, line: true, font: false, zones: false, fill: true, fib: false, label: true };
     default:
-      // Lines, rays, arrows, horizontal and vertical lines, cross lines, rectangles, channels.
-      return { color: true, line: true, font: false, zones: false, fib: false, label: true };
+      // Lines, rays, arrows, horizontal and vertical lines, cross lines.
+      return { color: true, line: true, font: false, zones: false, fill: false, fib: false, label: true };
   }
 }
 

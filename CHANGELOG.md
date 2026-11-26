@@ -30,6 +30,8 @@
 - Desktop app for macOS and Windows (Tauri): the same app in its own window. Full screen is
   the window's own; chart images and backups are saved through a real "Save as" dialog; links
   open in your browser. Installers are built on GitHub (Actions → Desktop app), not signed yet.
+- Rectangles and parallel channels have separate border and fill colors (two swatches in the
+  style bar); templates keep both.
 - Long/short positions show their target, stop and R:R labels only while pointed at or
   selected; the R:R label sits just under the entry line so the line stays visible; the
   target and width handles are squares, as in TradingView.

@@ -228,6 +228,7 @@ export class DrawingManager implements DrawingSource {
     if (support.font && patch.fontSize) clean.fontSize = patch.fontSize;
     if (support.zones && patch.profitColor) clean.profitColor = patch.profitColor;
     if (support.zones && patch.lossColor) clean.lossColor = patch.lossColor;
+    if (support.fill && patch.fillColor) clean.fillColor = patch.fillColor;
     if (support.fib && patch.levels) clean.levels = [...patch.levels].sort((x, y) => x - y);
     if (support.fib && patch.trendLine !== undefined) clean.trendLine = patch.trendLine;
     if (support.label && patch.label !== undefined) clean.label = patch.label;
@@ -1295,7 +1296,7 @@ export class DrawingManager implements DrawingSource {
 
 /** The style properties a drawing has set (what a template keeps). */
 function styleOf(d: Drawing): DrawingStyle {
-  const keys = ['color', 'width', 'lineStyle', 'fontSize', 'profitColor', 'lossColor', 'levels', 'trendLine', 'label', 'labelPos', 'labelSize'] as const;
+  const keys = ['color', 'width', 'lineStyle', 'fontSize', 'profitColor', 'lossColor', 'fillColor', 'levels', 'trendLine', 'label', 'labelPos', 'labelSize'] as const;
   const out: Record<string, unknown> = {};
   for (const k of keys) {
     const v = (d as unknown as Record<string, unknown>)[k];
