@@ -32,8 +32,8 @@
   open in your browser. Installers are built on GitHub (Actions → Desktop app), not signed yet.
 - Lines held at 45° with ⇧ (Shift) no longer wobble: the end snaps to a bar first and the
   height follows it exactly.
-- A selected drawing keeps its width and gets a soft glow in its own color, with its handles,
-  instead of turning thicker.
+- A selected drawing keeps its look and shows its handles (the dots at its points), instead of
+  turning thicker.
 - The magnet (and holding ⌘/Ctrl) acts only while drawing or moving a drawing. With the plain
   cursor the crosshair moves freely, so ⌘/Ctrl shortcuts don't make it jump to the candles.
 - "Remove all drawings" and "Restore backup" ask in the app's own dialog instead of the

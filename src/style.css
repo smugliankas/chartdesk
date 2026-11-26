@@ -1452,7 +1452,21 @@ body.light #timeframes {
   flex: none;
   width: 22px;
   height: 0;
-  border-top: 2px solid;
+  border-width: 0;
+  border-top-width: 2px;
+  border-top-style: solid;
+}
+
+/* Only the top border draws a line sample; the box sample uses all four. */
+.template-sample:not(.box) {
+  border-right: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+}
+
+.template-sample.box {
+  height: 14px;
+  border-radius: 2px;
 }
 
 .template-remove {

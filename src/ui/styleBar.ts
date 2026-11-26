@@ -1,4 +1,5 @@
 import type { DrawingManager } from '../drawings/DrawingManager';
+import { readable, withAlpha } from '../chart/appearance';
 import { enhanceSelect } from './selectMenu';
 import {
   DEFAULT_FONT_SIZE,
@@ -185,6 +186,7 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
       levelsMenu.style.left = `${fibGroup.offsetLeft}px`;
       levelsMenu.classList.remove('hidden');
     }
+    syncMenuButtons();
   });
   const levelsMenu = document.createElement('div');
   levelsMenu.className = 'levels-menu hidden';
@@ -226,6 +228,7 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
       labelInput.focus();
       labelInput.select();
     }
+    syncMenuButtons();
   });
   const labelMenu = document.createElement('div');
   labelMenu.className = 'levels-menu label-menu hidden';
@@ -281,6 +284,7 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
       renderTemplates();
       templateMenu.classList.remove('hidden');
     }
+    syncMenuButtons();
   });
   const templateMenu = document.createElement('div');
   templateMenu.className = 'levels-menu template-menu hidden';
@@ -327,11 +331,17 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
       const apply = document.createElement('button');
       apply.type = 'button';
       apply.className = 'template-apply';
+      // A small picture of the template: a box for boxes, a line for the rest, in its color
+      // (or the text color when that color would vanish on the menu, e.g. black on dark).
       const sample = document.createElement('span');
-      sample.className = 'template-sample';
-      sample.style.borderTopColor = t.style.color ?? d.color;
-      sample.style.borderTopStyle = t.style.lineStyle ?? 'solid';
-      sample.style.borderTopWidth = `${Math.max(2, t.style.width ?? DEFAULT_WIDTH)}px`;
+      const isBox = d.type === 'rect' || d.type === 'channel';
+      sample.className = 'template-sample' + (isBox ? ' box' : '');
+      const css = getComputedStyle(document.body);
+      const color = readable(t.style.color ?? d.color, css.getPropertyValue('--panel').trim(), css.getPropertyValue('--text').trim());
+      sample.style.borderColor = color;
+      sample.style.borderStyle = t.style.lineStyle ?? 'solid';
+      sample.style.borderWidth = `${Math.max(isBox ? 1.5 : 2, t.style.width ?? DEFAULT_WIDTH)}px`;
+      if (isBox) sample.style.background = withAlpha(color, 0.18);
       const name = document.createElement('span');
       name.textContent = t.name;
       apply.append(sample, name);
@@ -363,6 +373,7 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
       tfMenu.style.left = `${tfGroup.offsetLeft}px`;
       tfMenu.classList.remove('hidden');
     }
+    syncMenuButtons();
   });
   const tfMenu = document.createElement('div');
   tfMenu.className = 'levels-menu tf-menu hidden';
@@ -450,6 +461,16 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     tfMenu.classList.add('hidden');
     labelMenu.classList.add('hidden');
     templateMenu.classList.add('hidden');
+    syncMenuButtons();
+  }
+
+  /** A button that opens a menu is lit only while its menu is open (the timeframe one also while the drawing is limited). */
+  function syncMenuButtons(): void {
+    const open = (menu: HTMLElement) => !menu.classList.contains('hidden');
+    labelButton.classList.toggle('active', open(labelMenu));
+    templateButton.classList.toggle('active', open(templateMenu));
+    levelsButton.classList.toggle('active', open(levelsMenu));
+    tfButton.classList.toggle('active', !!drawings.selectedDrawing?.timeframes || open(tfMenu));
   }
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closePopovers();
@@ -484,7 +505,6 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     if (!support.fib) levelsMenu.classList.add('hidden');
 
     const limited = !!d.timeframes;
-    tfButton.classList.toggle('active', limited || !tfMenu.classList.contains('hidden'));
     tfButton.dataset.tip = limited ? `Shown on ${d.timeframes!.map((t) => TF_LABELS[t]).join(', ')}` : 'Show on timeframes (all)';
     tfButton.removeAttribute('title');
     for (const [tf, box] of tfChecks) box.checked = shownOn(d, tf);
@@ -511,17 +531,15 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
       const pos = d.labelPos ?? DEFAULT_LABEL_POS;
       for (const [p, b] of posButtons) b.classList.toggle('active', p === pos);
       sizeSelect.value = String(d.labelSize ?? DEFAULT_LABEL_SIZE);
-      labelButton.classList.toggle('active', !!d.label || !labelMenu.classList.contains('hidden'));
       const isBox = d.type === 'rect';
       for (const [p, b] of posButtons) b.title = isBox ? LABEL_POS_NAMES[p].replace('Above', 'Top').replace('On the line', 'Middle').replace('Below', 'Bottom') : LABEL_POS_NAMES[p];
     }
-    templateButton.classList.toggle('active', !templateMenu.classList.contains('hidden'));
+    syncMenuButtons();
     if (!templateMenu.classList.contains('hidden')) renderTemplates();
     if (d.type === 'fib') {
       const shown = new Set(fibLevelsOf(d));
       for (const [level, box] of levelChecks) box.checked = shown.has(level);
       trendBox.checked = fibShowsTrendLine(d);
-      levelsButton.classList.toggle('active', !levelsMenu.classList.contains('hidden'));
     }
   };
 }

@@ -259,11 +259,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     ctx.fillStyle = color;
     const width = d.width ?? DEFAULT_WIDTH;
     ctx.lineWidth = width;
-    // Selected: the same line with a soft glow in its own color, instead of a thicker line.
-    if (selected) {
-      ctx.shadowColor = glowColor(color);
-      ctx.shadowBlur = 6 * (window.devicePixelRatio || 1); // the blur is in screen pixels
-    }
+    // Selected: the drawing looks the same; its handles (the dots at its points) show it.
     setDash(ctx, d.lineStyle ?? 'solid', width);
     ctx.font = LABEL_FONT;
     const reach = (size.w + size.h) * 4;
@@ -676,14 +672,6 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
 
 
 /** Undoes the state changes a drawing may leave behind. */
-/** The glow around a selected drawing: its color, slightly see-through. */
-function glowColor(color: string): string {
-  const m = /^#([0-9a-f]{6})$/i.exec(color);
-  if (!m) return color;
-  const n = parseInt(m[1], 16);
-  return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, 1)`;
-}
-
 function resetState(ctx: CanvasRenderingContext2D): void {
   ctx.globalAlpha = 1;
   ctx.shadowBlur = 0;
