@@ -727,7 +727,7 @@ function squareHandle(d: Drawing, part: string): boolean {
 
 function handle(ctx: CanvasRenderingContext2D, x: number, y: number, fill: string, square = false): void {
   ctx.beginPath();
-  if (square) ctx.rect(Math.round(x) - 4, Math.round(y) - 4, 8, 8);
+  if (square) ctx.roundRect(Math.round(x) - 4.5, Math.round(y) - 4.5, 9, 9, 2.5);
   else ctx.arc(x, y, 4.5, 0, Math.PI * 2);
   ctx.fillStyle = fill;
   ctx.fill();
