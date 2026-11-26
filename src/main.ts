@@ -14,7 +14,7 @@ import {
 } from './alerts/notify';
 import { chooseAndRestoreBackup, downloadBackup } from './backup';
 import { openLinksInBrowser, saveFile } from './desktop';
-import { effectiveTextColor, loadAppearance, readable, saveAppearance, type Appearance } from './chart/appearance';
+import { contrastText, effectiveTextColor, loadAppearance, readable, saveAppearance, withAlpha, type Appearance } from './chart/appearance';
 import { ChartController } from './chart/ChartController';
 import { BarCountdown } from './chart/countdown';
 import { DrawingManager } from './drawings/DrawingManager';
@@ -170,6 +170,7 @@ function applyAppearance(a: Appearance): void {
   document.body.style.setProperty('--down', a.downColor);
   document.body.style.setProperty('--chart-text', effectiveTextColor(a));
   document.body.style.setProperty('--chart-bg', a.background);
+  document.body.style.setProperty('--crosshair', withAlpha(contrastText(a.background), 0.3));
   volumeButton.classList.toggle('active', a.showVolume);
   drawings.redraw();
   syncCountdown();
@@ -1021,27 +1022,59 @@ cc.chart.subscribeCrosshairMove((param) => {
   crosshairY = param.point ? param.point.y : null;
   crosshairPrice = crosshairY === null ? null : cc.yToPrice(crosshairY);
   placePriceAlertButton(crosshairY);
-  placeCrossCursor(param.point, param.logical as number | undefined);
   showLegend(bar ? { time: bar.time as number, open: bar.open, high: bar.high, low: bar.low, close: bar.close } : cc.lastCandle);
 });
 
-// The cursor over the chart: a small cross drawn where the crosshair lines meet. The mouse
-// pointer itself is hidden there (style.css), since the vertical line snaps to the bar under
-// the mouse and a system cross would sit up to half a bar beside it.
+// The crosshair and the cursor, drawn by us rather than by the chart library: the library moves
+// its lines in its own drawing loop and snaps the vertical one to whole bars, which felt jumpy
+// (worst when sweeping the mouse to a corner). Ours follow every mouse move as it happens, the
+// vertical one included. The cross is the cursor (the system pointer is hidden over the chart)
+// and always sits on the mouse; with the magnet on, the lines jump to the bar and its nearest
+// open/high/low/close while the cross stays with the mouse. The chart still draws the price and
+// time labels on the scales.
+const crosshairV = $<HTMLDivElement>('crosshairV');
+const crosshairH = $<HTMLDivElement>('crosshairH');
 const crossCursor = $<HTMLDivElement>('crossCursor');
 crossCursor.innerHTML =
-  '<svg width="21" height="21" viewBox="0 0 21 21" aria-hidden="true">' +
-  '<path d="M10.5 0v21M0 10.5h21" stroke="var(--cross-halo)" stroke-width="3"/>' +
-  '<path d="M10.5 0v21M0 10.5h21" stroke="currentColor" stroke-width="1"/></svg>';
+  '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">' +
+  '<path d="M10 0v20M0 10h20" stroke="var(--cross-halo)" stroke-width="4"/>' +
+  '<path d="M10 0v20M0 10h20" stroke="currentColor" stroke-width="2"/></svg>';
 
-function placeCrossCursor(point: { x: number; y: number } | undefined, logical: number | undefined): void {
-  // Over a drawing or an alert line the mouse shows its own cursor (move, resize) instead.
-  const center = point && !chartEl.style.cursor ? cc.crosshairCenter(point, logical) : null;
-  crossCursor.classList.toggle('hidden', !center);
-  if (center) crossCursor.style.transform = `translate(${Math.round(center.x) - 10}px, ${Math.round(center.y) - 10}px)`;
+function hideCrosshair(): void {
+  crosshairV.classList.add('hidden');
+  crosshairH.classList.add('hidden');
+  crossCursor.classList.add('hidden');
 }
 
-chartWrap.addEventListener('mouseleave', () => crossCursor.classList.add('hidden'));
+function placeCrosshair(e: PointerEvent): void {
+  const r = chartEl.getBoundingClientRect();
+  const x = e.clientX - r.left;
+  const y = e.clientY - r.top;
+  const pane = cc.paneSize();
+  if (x < 0 || y < 0 || x >= pane.width || y >= pane.height || cc.barCount === 0) return hideCrosshair();
+  let lx = x;
+  let ly = y;
+  if (cc.magnetOn) {
+    const logical = cc.xToLogical(x);
+    const snapped = logical === null ? null : cc.crosshairCenter({ x, y }, Math.round(logical));
+    if (snapped) ({ x: lx, y: ly } = snapped);
+  }
+  // The 1px lines are centered on the 2px cross; on a 1x screen half a pixel would blur them.
+  const half = window.devicePixelRatio >= 2 ? 0.5 : 0;
+  crosshairV.style.height = `${pane.height}px`;
+  crosshairV.style.transform = `translateX(${Math.round(lx) - half}px)`;
+  crosshairH.style.width = `${pane.width}px`;
+  crosshairH.style.transform = `translateY(${Math.round(ly) - half}px)`;
+  crosshairV.classList.remove('hidden');
+  crosshairH.classList.remove('hidden');
+  // Over a drawing or an alert line the mouse shows its own cursor (move, resize) instead.
+  const overSomething = chartEl.style.cursor !== '' || priceAlertHover;
+  crossCursor.classList.toggle('hidden', overSomething);
+  crossCursor.style.transform = `translate(${Math.round(x) - 10}px, ${Math.round(y) - 10}px)`;
+}
+
+chartWrap.addEventListener('pointermove', placeCrosshair);
+chartWrap.addEventListener('pointerleave', hideCrosshair);
 
 function showLegend(c: Candle | undefined): void {
   if (!c) {
