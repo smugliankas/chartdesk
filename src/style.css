@@ -846,8 +846,8 @@ button.link:hover:not(:disabled) {
 .price-alert {
   position: absolute;
   z-index: 4;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -856,8 +856,8 @@ button.link:hover:not(:disabled) {
 }
 
 .price-alert svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 /* The chart gets the mouse through the bell (see main.ts); .hover stands in for :hover. */
@@ -1324,6 +1324,167 @@ body.light #timeframes {
   margin-top: 4px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
+}
+
+/* Text on a drawing: the text, a 3×3 grid of positions, and the size. */
+.label-menu,
+.template-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 220px;
+  white-space: normal;
+}
+
+.label-menu input[type='text'],
+.template-save input[type='text'] {
+  width: 100%;
+  text-transform: none;
+}
+
+.label-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+/* Each position: a short line with a small bar where the text goes. */
+.label-pos {
+  position: relative;
+  height: 28px;
+  padding: 0;
+}
+
+.label-pos::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  height: 1px;
+  background: var(--muted);
+}
+
+.label-pos span {
+  position: absolute;
+  width: 12px;
+  height: 4px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.label-pos[class*='top-'] span {
+  top: 6px;
+}
+
+.label-pos[class*='middle-'] span {
+  top: calc(50% - 2px);
+}
+
+.label-pos[class*='bottom-'] span {
+  bottom: 6px;
+}
+
+.label-pos[class*='-left'] span {
+  left: 8px;
+}
+
+.label-pos[class*='-center'] span {
+  left: calc(50% - 6px);
+}
+
+.label-pos[class*='-right'] span {
+  right: 8px;
+}
+
+.label-size {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.label-size .select-button {
+  height: 26px;
+  padding: 0 6px 0 8px;
+  gap: 6px;
+}
+
+/* Templates: saved styles to apply with one click, and a row to save a new one. */
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.template-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.template-apply {
+  flex: 1;
+  justify-content: flex-start;
+  gap: 10px;
+  min-width: 0;
+  height: 30px;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+
+.template-apply:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.template-apply span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-sample {
+  flex: none;
+  width: 22px;
+  height: 0;
+  border-top: 2px solid;
+}
+
+.template-remove {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.template-remove:hover:not(:disabled) {
+  color: var(--loss);
+  background: var(--hover);
+}
+
+.template-empty {
+  padding: 4px 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.template-save {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+}
+
+.template-save button {
+  flex: none;
 }
 
 /* --- Right-click menu ------------------------------------------------------------- */

@@ -20,6 +20,16 @@ function memoryStorage(entries: Record<string, string> = {}): Storage {
 const line = (id: string) => ({ id, type: 'hline', price: 1 });
 
 describe('backup', () => {
+  it('keeps drawing templates but never a broker sign-in', () => {
+    const storage = memoryStorage({
+      'chartdesk:templates': JSON.stringify({ rect: [{ name: 'FVG', style: { lineStyle: 'dashed', label: 'FVG' } }] }),
+      'chartdesk:ctrader': JSON.stringify({ accessToken: 'secret-token' }),
+    });
+    const backup = collectBackup(storage, new Date('2026-11-26T01:00:00Z'));
+    expect(Object.keys(backup.data)).toEqual(['chartdesk:templates']);
+    expect(JSON.stringify(backup)).not.toContain('secret-token');
+  });
+
   it('exports only ChartDesk data, and renames keys from the old project name', () => {
     const storage = memoryStorage({
       'chartdesk:drawings:binance:BTCUSDT': JSON.stringify([line('a'), line('b')]),

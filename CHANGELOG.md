@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Drawing templates: save a drawing's look as a named template, e.g. a dashed rectangle
+  called "FVG" or a dotted line called "Liquidity", and give it to any other drawing of that
+  kind with one click (bookmark button in the style bar). New drawings of that kind take the
+  template's look; templates are kept in backups.
+- Text on lines and boxes (A button in the style bar): type a word like "FVG" and pick one of
+  nine places: above, on or below a line at its start, middle or end (turned along the line),
+  or the top, middle or bottom of a box, left, center or right. With its own size.
+- The alert bell beside the price scale is back to its old size.
 - The alert bell next to the price scale is a little bigger and disappears the moment the
   mouse reaches the price scale, like TradingView's.
 - Smoother, calmer crosshair: thin solid lines in the theme's text color, mostly see-through,

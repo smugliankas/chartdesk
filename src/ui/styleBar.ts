@@ -2,6 +2,8 @@ import type { DrawingManager } from '../drawings/DrawingManager';
 import { enhanceSelect } from './selectMenu';
 import {
   DEFAULT_FONT_SIZE,
+  DEFAULT_LABEL_POS,
+  DEFAULT_LABEL_SIZE,
   DEFAULT_LOSS_COLOR,
   DEFAULT_PROFIT_COLOR,
   DEFAULT_WIDTH,
@@ -9,12 +11,14 @@ import {
   fibLevelsOf,
   fibShowsTrendLine,
   FONT_SIZES,
+  LABEL_POSITIONS,
   LINE_STYLES,
   LINE_WIDTHS,
   PALETTE,
   styleSupport,
   type Drawing,
   type DrawingStyle,
+  type LabelPos,
   type LineStyle,
 } from '../drawings/model';
 import { shownOn } from '../drawings/model';
@@ -34,6 +38,26 @@ const STYLE_NAMES: Record<LineStyle, string> = { solid: 'Solid', dashed: 'Dashed
 
 const LEVELS_ICON =
   '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h16"/><path d="M17 10l2 2-2 2"/></svg>';
+
+const LABEL_ICON =
+  '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19h18"/><path d="M7 15l5-11 5 11M8.8 11h6.4"/></svg>';
+
+const TEMPLATE_ICON =
+  '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1 1 0 011 1v15l-6-4-6 4V5a1 1 0 011-1z"/></svg>';
+
+const LABEL_POS_NAMES: Record<LabelPos, string> = {
+  'top-left': 'Above, left',
+  'top-center': 'Above, middle',
+  'top-right': 'Above, right',
+  'middle-left': 'On the line, left',
+  'middle-center': 'On the line, middle',
+  'middle-right': 'On the line, right',
+  'bottom-left': 'Below, left',
+  'bottom-center': 'Below, middle',
+  'bottom-right': 'Below, right',
+};
+
+const LABEL_SIZES: readonly number[] = [10, 11, 12, 13, 14, 16, 18, 20, 24];
 
 const TIMEFRAMES_ICON =
   '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="M12 7.5V12l3 2"/></svg>';
@@ -191,6 +215,145 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
   trendLabel.append(trendBox, 'Trend line');
   levelsMenu.append(trendLabel);
 
+  // --- text on the drawing, and where it sits ---------------------------------------
+  const labelGroup = group();
+  const labelButton = button(labelGroup, LABEL_ICON, 'Text on the drawing', () => {
+    const open = !labelMenu.classList.contains('hidden');
+    closePopovers();
+    if (!open) {
+      labelMenu.style.left = `${labelGroup.offsetLeft}px`;
+      labelMenu.classList.remove('hidden');
+      labelInput.focus();
+      labelInput.select();
+    }
+  });
+  const labelMenu = document.createElement('div');
+  labelMenu.className = 'levels-menu label-menu hidden';
+  bar.append(labelMenu);
+
+  const labelInput = document.createElement('input');
+  labelInput.type = 'text';
+  labelInput.placeholder = 'Text, e.g. FVG';
+  labelInput.spellcheck = false;
+  // Shown as you type; one undo step when you leave the box or press Enter.
+  labelInput.addEventListener('input', () => drawings.setStyle({ label: labelInput.value }, true));
+  labelInput.addEventListener('change', () => drawings.setStyle({ label: labelInput.value }));
+  labelInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      drawings.setStyle({ label: labelInput.value });
+      closePopovers();
+    }
+  });
+
+  const posTitle = document.createElement('div');
+  posTitle.className = 'tf-title';
+  posTitle.textContent = 'Position';
+  const posGrid = document.createElement('div');
+  posGrid.className = 'label-grid';
+  const posButtons = new Map<LabelPos, HTMLButtonElement>();
+  for (const pos of LABEL_POSITIONS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `label-pos ${pos}`;
+    b.title = LABEL_POS_NAMES[pos];
+    b.innerHTML = '<span></span>';
+    b.addEventListener('click', () => drawings.setStyle({ labelPos: pos }));
+    posGrid.append(b);
+    posButtons.set(pos, b);
+  }
+
+  const sizeRow = document.createElement('label');
+  sizeRow.className = 'label-size';
+  const sizeSelect = document.createElement('select');
+  for (const size of LABEL_SIZES) sizeSelect.append(new Option(`${size}px`, String(size)));
+  sizeSelect.addEventListener('change', () => drawings.setStyle({ labelSize: Number(sizeSelect.value) }));
+  sizeRow.append('Size', sizeSelect);
+  labelMenu.append(labelInput, posTitle, posGrid, sizeRow);
+  enhanceSelect(sizeSelect);
+
+  // --- templates: named styles for this kind of drawing ----------------------------------
+  const templateGroup = group();
+  const templateButton = button(templateGroup, TEMPLATE_ICON, 'Templates', () => {
+    const open = !templateMenu.classList.contains('hidden');
+    closePopovers();
+    if (!open) {
+      templateMenu.style.left = `${templateGroup.offsetLeft}px`;
+      renderTemplates();
+      templateMenu.classList.remove('hidden');
+    }
+  });
+  const templateMenu = document.createElement('div');
+  templateMenu.className = 'levels-menu template-menu hidden';
+  bar.append(templateMenu);
+
+  const templateList = document.createElement('div');
+  templateList.className = 'template-list';
+  const saveRow = document.createElement('form');
+  saveRow.className = 'template-save';
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = 'Name, e.g. FVG';
+  nameInput.spellcheck = false;
+  const saveButton = document.createElement('button');
+  saveButton.type = 'submit';
+  saveButton.textContent = 'Save';
+  saveRow.append(nameInput, saveButton);
+  saveRow.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!nameInput.value.trim()) return nameInput.focus();
+    drawings.saveTemplate(nameInput.value);
+    nameInput.value = '';
+    renderTemplates();
+  });
+  const saveTitle = document.createElement('div');
+  saveTitle.className = 'tf-title';
+  saveTitle.textContent = 'Save this style as a template';
+  templateMenu.append(templateList, saveTitle, saveRow);
+
+  function renderTemplates(): void {
+    const d = drawings.selectedDrawing;
+    if (!d) return;
+    const list = drawings.templatesFor(d.type);
+    templateList.replaceChildren();
+    if (list.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'template-empty';
+      empty.textContent = 'No templates for this tool yet.';
+      templateList.append(empty);
+    }
+    for (const t of list) {
+      const row = document.createElement('div');
+      row.className = 'template-row';
+      const apply = document.createElement('button');
+      apply.type = 'button';
+      apply.className = 'template-apply';
+      const sample = document.createElement('span');
+      sample.className = 'template-sample';
+      sample.style.borderTopColor = t.style.color ?? d.color;
+      sample.style.borderTopStyle = t.style.lineStyle ?? 'solid';
+      sample.style.borderTopWidth = `${Math.max(2, t.style.width ?? DEFAULT_WIDTH)}px`;
+      const name = document.createElement('span');
+      name.textContent = t.name;
+      apply.append(sample, name);
+      apply.title = `Apply "${t.name}"`;
+      apply.addEventListener('click', () => {
+        drawings.applyTemplate(t.name);
+        closePopovers();
+      });
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'template-remove';
+      remove.textContent = '×';
+      remove.title = `Delete "${t.name}"`;
+      remove.addEventListener('click', () => {
+        drawings.deleteTemplate(d.type, t.name);
+        renderTemplates();
+      });
+      row.append(apply, remove);
+      templateList.append(row);
+    }
+  }
+
   // --- timeframes the drawing shows on -----------------------------------------
   const tfGroup = group();
   const tfButton = button(tfGroup, TIMEFRAMES_ICON, 'Show on timeframes', () => {
@@ -285,6 +448,8 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     palette.classList.add('hidden');
     levelsMenu.classList.add('hidden');
     tfMenu.classList.add('hidden');
+    labelMenu.classList.add('hidden');
+    templateMenu.classList.add('hidden');
   }
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closePopovers();
@@ -307,13 +472,15 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     lineStyleGroup.classList.toggle('hidden', !support.line);
     fibGroup.classList.toggle('hidden', !support.fib);
     fontGroup.classList.toggle('hidden', !support.font);
+    labelGroup.classList.toggle('hidden', !support.label);
+    if (!support.label) labelMenu.classList.add('hidden');
     alertGroup.classList.toggle('hidden', !alerts?.supports(d));
     alertButton.classList.toggle('active', !!alerts?.has(d.id));
     lockButton.innerHTML = d.locked ? ICONS.lock : ICONS.unlock;
     lockButton.classList.toggle('active', !!d.locked);
     lockButton.dataset.tip = d.locked ? 'Unlock' : 'Lock (stops it from being moved)';
     lockButton.removeAttribute('title');
-    for (const g of [colorGroup, zoneGroup, widthGroup, lineStyleGroup, fibGroup, tfGroup, fontGroup]) g.classList.toggle('locked', !!d.locked);
+    for (const g of [colorGroup, zoneGroup, widthGroup, lineStyleGroup, fibGroup, tfGroup, fontGroup, labelGroup, templateGroup]) g.classList.toggle('locked', !!d.locked);
     if (!support.fib) levelsMenu.classList.add('hidden');
 
     const limited = !!d.timeframes;
@@ -338,6 +505,18 @@ export function createStyleBar(host: HTMLElement, drawings: DrawingManager, aler
     const lineStyle = d.lineStyle ?? 'solid';
     for (const [s, b] of styleButtons) b.classList.toggle('active', s === lineStyle);
     if (d.type === 'text') fontSelect.value = String(d.fontSize ?? DEFAULT_FONT_SIZE);
+    if (support.label) {
+      // Don't overwrite what is being typed.
+      if (document.activeElement !== labelInput) labelInput.value = d.label ?? '';
+      const pos = d.labelPos ?? DEFAULT_LABEL_POS;
+      for (const [p, b] of posButtons) b.classList.toggle('active', p === pos);
+      sizeSelect.value = String(d.labelSize ?? DEFAULT_LABEL_SIZE);
+      labelButton.classList.toggle('active', !!d.label || !labelMenu.classList.contains('hidden'));
+      const isBox = d.type === 'rect';
+      for (const [p, b] of posButtons) b.title = isBox ? LABEL_POS_NAMES[p].replace('Above', 'Top').replace('On the line', 'Middle').replace('Below', 'Bottom') : LABEL_POS_NAMES[p];
+    }
+    templateButton.classList.toggle('active', !templateMenu.classList.contains('hidden'));
+    if (!templateMenu.classList.contains('hidden')) renderTemplates();
     if (d.type === 'fib') {
       const shown = new Set(fibLevelsOf(d));
       for (const [level, box] of levelChecks) box.checked = shown.has(level);

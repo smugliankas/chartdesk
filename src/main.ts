@@ -659,7 +659,7 @@ function placePriceAlertButton(y: number | null): void {
   }
   clearTimeout(priceAlertHideTimer);
   priceAlertPrice = price;
-  priceAlertButton.style.top = `${Math.round(y) - 13}px`;
+  priceAlertButton.style.top = `${Math.round(y) - 11}px`;
   priceAlertButton.style.right = `${cc.priceScaleWidth() + 4}px`;
   priceAlertButton.setAttribute('aria-label', `Add alert at ${cc.formatPrice(price)}`);
   priceAlertButton.classList.remove('hidden');
@@ -1047,6 +1047,8 @@ function hideCrosshair(): void {
 }
 
 function placeCrosshair(e: PointerEvent): void {
+  // Over the style bar, a menu or a button on the chart: no crosshair, like the chart's own.
+  if (!chartEl.contains(e.target as Node)) return hideCrosshair();
   const r = chartEl.getBoundingClientRect();
   const x = e.clientX - r.left;
   const y = e.clientY - r.top;

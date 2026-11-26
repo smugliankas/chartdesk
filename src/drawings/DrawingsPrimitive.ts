@@ -12,6 +12,8 @@ import type { Timeframe } from '../types';
 import { extendSegment, handlesOf, segmentCrossesRect } from './geometry';
 import {
   DEFAULT_FONT_SIZE,
+  DEFAULT_LABEL_POS,
+  DEFAULT_LABEL_SIZE,
   DEFAULT_WIDTH,
   DEFAULT_LOSS_COLOR,
   DEFAULT_PROFIT_COLOR,
@@ -22,6 +24,7 @@ import {
   formatVolume,
   measureText,
   shownOn,
+  styleSupport,
   TEXT_PADDING,
   textFont,
   textLineHeight,
@@ -434,6 +437,10 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
         break;
     }
 
+    if (d.label && styleSupport(d.type).label) {
+      ctx.setLineDash([]);
+      this.drawLabel(ctx, size, d, color);
+    }
     ctx.shadowBlur = 0;
     if (selected && !d.locked) {
       ctx.setLineDash([]);
@@ -443,6 +450,96 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       }
     }
     resetState(ctx);
+  }
+
+  /**
+   * A drawing's text, at one of nine places. On a line: above, on or below it, at its left end,
+   * middle or right end, turned along the line. In a box: at its top, middle or bottom, left,
+   * center or right. "On the line" puts a patch of background behind the text so it reads.
+   */
+  private drawLabel(ctx: CanvasRenderingContext2D, size: { w: number; h: number }, d: Drawing, color: string): void {
+    const [v, h] = (d.labelPos ?? DEFAULT_LABEL_POS).split('-') as ['top' | 'middle' | 'bottom', 'left' | 'center' | 'right'];
+    const fontSize = d.labelSize ?? DEFAULT_LABEL_SIZE;
+    const gap = 4 + (d.width ?? DEFAULT_WIDTH) / 2;
+    ctx.font = textFont(fontSize);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 1;
+
+    // Boxes: the text sits inside.
+    if (d.type === 'rect') {
+      const a = this.xy(d.p1);
+      const b = this.xy(d.p2);
+      if (!a || !b) return;
+      const left = Math.min(a.x, b.x) + 6;
+      const right = Math.max(a.x, b.x) - 6;
+      const top = Math.min(a.y, b.y) + 4;
+      const bottom = Math.max(a.y, b.y) - 4;
+      const x = h === 'left' ? left : h === 'right' ? right : (left + right) / 2;
+      const y = v === 'top' ? top : v === 'bottom' ? bottom : (top + bottom) / 2;
+      ctx.textAlign = h;
+      ctx.textBaseline = v === 'middle' ? 'middle' : v;
+      ctx.fillText(d.label!, x, y);
+      return;
+    }
+
+    // Lines: a stretch from (x1, y1) to (x2, y2) on screen, left to right.
+    let seg: [number, number, number, number] | null = null;
+    switch (d.type) {
+      case 'hline': {
+        const y = this.cc.priceToY(d.price);
+        if (y !== null) seg = [8, y, size.w - 8, y];
+        break;
+      }
+      case 'hray': {
+        const p = this.xy(d.p);
+        if (p) seg = [p.x + 8, p.y, size.w - 8, p.y];
+        break;
+      }
+      case 'cross': {
+        const p = this.xy(d.p);
+        if (p) seg = [8, p.y, size.w - 8, p.y];
+        break;
+      }
+      case 'vline': {
+        const x = this.cc.timeToX(d.time);
+        if (x === null) return;
+        // Up the line: left end at the bottom, right end at the top (like a turned label).
+        seg = [x, size.h - 8, x, 8];
+        break;
+      }
+      default: {
+        if (!('p1' in d) || !('p2' in d)) return;
+        const a = this.xy(d.p1);
+        const b = this.xy(d.p2);
+        if (!a || !b) return;
+        seg = a.x <= b.x ? [a.x, a.y, b.x, b.y] : [b.x, b.y, a.x, a.y];
+      }
+    }
+    if (!seg) return;
+    const [x1, y1, x2, y2] = seg;
+    let angle = Math.atan2(y2 - y1, x2 - x1);
+    if (d.type === 'vline') angle = -Math.PI / 2;
+    const t = h === 'left' ? 0 : h === 'right' ? 1 : 0.5;
+    const px = x1 + (x2 - x1) * t;
+    const py = y1 + (y2 - y1) * t;
+    const inset = h === 'left' ? 4 : h === 'right' ? -4 : 0;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(angle);
+    ctx.textAlign = h;
+    ctx.textBaseline = v === 'top' ? 'bottom' : v === 'bottom' ? 'top' : 'middle';
+    const ty = v === 'top' ? -gap : v === 'bottom' ? gap : 0;
+    if (v === 'middle') {
+      const w = ctx.measureText(d.label!).width;
+      const bx = h === 'left' ? inset - 3 : h === 'right' ? inset - w - 3 : -w / 2 - 3;
+      ctx.save();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = this.cc.themeColors.background;
+      ctx.fillRect(bx, -fontSize / 2 - 2, w + 6, fontSize + 4);
+      ctx.restore();
+    }
+    ctx.fillText(d.label!, inset, ty);
+    ctx.restore();
   }
 
   /** Price range: the distance between two prices. Date range: the bars and time between two dates. */

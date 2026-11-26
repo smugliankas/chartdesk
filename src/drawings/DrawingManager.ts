@@ -22,6 +22,7 @@ import {
   textLineHeight,
   type Drawing,
   type DrawingStyle,
+  type DrawingTemplate,
   type DrawingType,
   type ParallelChannel,
   type Point,
@@ -31,7 +32,7 @@ import {
   type TwoPointType,
 } from './model';
 import type { Timeframe } from '../types';
-import { loadDrawings, loadStyleDefaults, saveDrawings, saveStyleDefaults } from './storage';
+import { loadDrawings, loadStyleDefaults, loadTemplates, saveDrawings, saveStyleDefaults, saveTemplates } from './storage';
 
 interface DragState {
   id: string;
@@ -97,6 +98,8 @@ export class DrawingManager implements DrawingSource {
   private textEditor: HTMLTextAreaElement | null = null;
   /** Last-used style per drawing type; new drawings start with it. */
   private styleDefaults = loadStyleDefaults();
+  /** Named styles per kind of drawing (see saveTemplate). */
+  private templates = loadTemplates();
   /** Snapshot taken when a live style preview (e.g. dragging in the color picker) starts. */
   private styleBefore: Drawing[] | null = null;
   /** Copied drawing (⌘C), pasted with ⌘V. Shared across symbols. */
@@ -224,14 +227,52 @@ export class DrawingManager implements DrawingSource {
     if (support.zones && patch.lossColor) clean.lossColor = patch.lossColor;
     if (support.fib && patch.levels) clean.levels = [...patch.levels].sort((x, y) => x - y);
     if (support.fib && patch.trendLine !== undefined) clean.trendLine = patch.trendLine;
+    if (support.label && patch.label !== undefined) clean.label = patch.label;
+    if (support.label && patch.labelPos) clean.labelPos = patch.labelPos;
+    if (support.label && patch.labelSize) clean.labelSize = patch.labelSize;
 
     this.drawings = this.drawings.map((x) => (x.id === d.id ? ({ ...x, ...clean } as Drawing) : x));
     if (!live) {
       this.pushHistory(before);
       this.save();
-      this.styleDefaults = { ...this.styleDefaults, [d.type]: { ...this.styleDefaults[d.type], ...clean } };
+      // New drawings take the look, not the words: the text stays with this drawing (or a template).
+      const { label: _text, ...look } = clean;
+      this.styleDefaults = { ...this.styleDefaults, [d.type]: { ...this.styleDefaults[d.type], ...look } };
       saveStyleDefaults(this.styleDefaults);
     }
+    this.changed();
+  }
+
+  // --- templates: named styles per kind of drawing ----------------------------------
+
+  /** Saved templates for a kind of drawing, in the order they were made. */
+  templatesFor(type: DrawingType): readonly DrawingTemplate[] {
+    return this.templates[type] ?? [];
+  }
+
+  /** Saves the selected drawing's style (and text) as a template; a same-named one is replaced. */
+  saveTemplate(name: string): void {
+    const d = this.selectedDrawing;
+    const n = name.trim();
+    if (!d || !n) return;
+    const list = this.templatesFor(d.type).filter((t) => t.name !== n);
+    this.templates = { ...this.templates, [d.type]: [...list, { name: n, style: styleOf(d) }] };
+    saveTemplates(this.templates);
+    this.changed();
+  }
+
+  /** Gives the selected drawing a template's style; new drawings of that kind follow it too. */
+  applyTemplate(name: string): void {
+    const d = this.selectedDrawing;
+    const t = d && this.templatesFor(d.type).find((x) => x.name === name);
+    if (!t) return;
+    // A template without text takes the text off, so the drawing matches it.
+    this.setStyle({ label: '', ...t.style });
+  }
+
+  deleteTemplate(type: DrawingType, name: string): void {
+    this.templates = { ...this.templates, [type]: this.templatesFor(type).filter((t) => t.name !== name) };
+    saveTemplates(this.templates);
     this.changed();
   }
 
@@ -1239,3 +1280,13 @@ export class DrawingManager implements DrawingSource {
   };
 }
 
+/** The style properties a drawing has set (what a template keeps). */
+function styleOf(d: Drawing): DrawingStyle {
+  const keys = ['color', 'width', 'lineStyle', 'fontSize', 'profitColor', 'lossColor', 'levels', 'trendLine', 'label', 'labelPos', 'labelSize'] as const;
+  const out: Record<string, unknown> = {};
+  for (const k of keys) {
+    const v = (d as unknown as Record<string, unknown>)[k];
+    if (v !== undefined) out[k] = Array.isArray(v) ? [...v] : v;
+  }
+  return out as DrawingStyle;
+}

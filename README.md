@@ -32,6 +32,7 @@ your machine.
 - Bar replay: pick a bar and play the chart forward from it, at your speed or bar by bar
 - Show a drawing only on the timeframes you choose (e.g. 4H and above)
 - Drawing styles: color, line width, solid/dashed/dotted lines, text size. Each tool remembers the last style you used
+- Drawing templates (e.g. a dashed "FVG" box, a dotted "Liquidity" line) and text on lines and boxes, placed above, on or below, at the start, middle or end
 - Magnet mode: snap points to a bar's open, high, low or close
 - Undo / redo, select, drag (whole drawing or one handle), delete with `Del`
 - Right-click menu, copy / paste / duplicate, lock drawings, hide all drawings

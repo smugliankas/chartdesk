@@ -7,6 +7,32 @@ export interface Point {
 
 export type LineStyle = 'solid' | 'dashed' | 'dotted';
 
+/** Where a drawing's text sits: above, on or below the line (or the top, middle or bottom of a box), at its start, middle or end. */
+export type LabelPos =
+  | 'top-left'
+  | 'top-center'
+  | 'top-right'
+  | 'middle-left'
+  | 'middle-center'
+  | 'middle-right'
+  | 'bottom-left'
+  | 'bottom-center'
+  | 'bottom-right';
+
+export const LABEL_POSITIONS: readonly LabelPos[] = [
+  'top-left',
+  'top-center',
+  'top-right',
+  'middle-left',
+  'middle-center',
+  'middle-right',
+  'bottom-left',
+  'bottom-center',
+  'bottom-right',
+];
+export const DEFAULT_LABEL_POS: LabelPos = 'top-center';
+export const DEFAULT_LABEL_SIZE = 12;
+
 interface Base {
   id: string;
   color: string;
@@ -19,6 +45,10 @@ interface Base {
   hidden?: boolean;
   /** Timeframes the drawing is shown on. Missing: all of them. */
   timeframes?: Timeframe[];
+  /** Text shown on a line or in a box (e.g. "FVG"), where, and how big. */
+  label?: string;
+  labelPos?: LabelPos;
+  labelSize?: number;
 }
 
 export type TrendLine = Base & { type: 'trend'; p1: Point; p2: Point };
@@ -134,6 +164,15 @@ export interface DrawingStyle {
   lossColor?: string;
   levels?: number[];
   trendLine?: boolean;
+  label?: string;
+  labelPos?: LabelPos;
+  labelSize?: number;
+}
+
+/** A named style for one kind of drawing (e.g. a dashed rectangle called "FVG"), kept for reuse. */
+export interface DrawingTemplate {
+  name: string;
+  style: DrawingStyle;
 }
 
 export const DEFAULT_PROFIT_COLOR = '#26a69a';
@@ -159,6 +198,8 @@ export interface StyleSupport {
   zones: boolean;
   /** Level toggles and trend line (Fibonacci). */
   fib: boolean;
+  /** Text on the drawing, with a position. */
+  label: boolean;
 }
 
 /** Which style controls apply to a drawing type. */
@@ -166,16 +207,19 @@ export function styleSupport(type: DrawingType): StyleSupport {
   switch (type) {
     case 'long':
     case 'short':
-      return { color: false, line: false, font: false, zones: true, fib: false };
+      return { color: false, line: false, font: false, zones: true, fib: false, label: false };
     case 'text':
-      return { color: true, line: false, font: true, zones: false, fib: false };
+      return { color: true, line: false, font: true, zones: false, fib: false, label: false };
     case 'fib':
-      return { color: true, line: true, font: false, zones: false, fib: true };
+      return { color: true, line: true, font: false, zones: false, fib: true, label: false };
     case 'pricerange':
     case 'daterange':
-      return { color: true, line: false, font: false, zones: false, fib: false };
+      return { color: true, line: false, font: false, zones: false, fib: false, label: false };
+    case 'brush':
+      return { color: true, line: true, font: false, zones: false, fib: false, label: false };
     default:
-      return { color: true, line: true, font: false, zones: false, fib: false };
+      // Lines, rays, arrows, horizontal and vertical lines, cross lines, rectangles, channels.
+      return { color: true, line: true, font: false, zones: false, fib: false, label: true };
   }
 }
 

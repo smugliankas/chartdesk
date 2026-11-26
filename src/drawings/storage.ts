@@ -1,4 +1,4 @@
-import type { Drawing, DrawingStyle, DrawingType } from './model';
+import type { Drawing, DrawingStyle, DrawingTemplate, DrawingType } from './model';
 
 export const DRAWINGS_PREFIX = 'chartdesk:drawings:';
 /** Key prefix used before the project was named ChartDesk; read once and moved over. */
@@ -186,6 +186,28 @@ export function loadStyleDefaults(): Partial<Record<DrawingType, DrawingStyle>> 
 export function saveStyleDefaults(styles: Partial<Record<DrawingType, DrawingStyle>>): void {
   try {
     localStorage.setItem(STYLES_KEY, JSON.stringify(styles));
+  } catch {
+    /* ignore */
+  }
+}
+
+// --- named templates per tool ---------------------------------------------------
+
+const TEMPLATES_KEY = 'chartdesk:templates';
+
+export function loadTemplates(): Partial<Record<DrawingType, DrawingTemplate[]>> {
+  try {
+    const raw = localStorage.getItem(TEMPLATES_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? (parsed as Partial<Record<DrawingType, DrawingTemplate[]>>) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveTemplates(templates: Partial<Record<DrawingType, DrawingTemplate[]>>): void {
+  try {
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates));
   } catch {
     /* ignore */
   }

@@ -13,6 +13,8 @@ const PREFIX = 'chartdesk:';
 /** Keys from before the project was named ChartDesk. */
 const OLD_PREFIX = 'chart-app:';
 const FORMAT = 'chartdesk-backup';
+/** Sign-ins stay on this computer: a backup file should never carry them. */
+const NOT_BACKED_UP = new Set(['chartdesk:ctrader']);
 
 export interface Backup {
   format: typeof FORMAT;
@@ -45,6 +47,7 @@ export function collectBackup(
     if (!key) continue;
     const value = storage.getItem(key);
     if (value === null) continue;
+    if (NOT_BACKED_UP.has(key)) continue;
     if (key.startsWith(PREFIX)) data[key] = value;
     else if (key.startsWith(OLD_PREFIX)) {
       // Not yet moved to the new name: export it under the new one, unless that exists.
