@@ -22,6 +22,18 @@ export interface SymbolInfo {
   source?: string;
 }
 
+/** A source that needs the person to sign in to their own account first (e.g. cTrader). */
+export interface BrokerAccount {
+  isConnected(): boolean;
+  /** Which account is in use, e.g. "Pepperstone 5123456 (demo)"; null before signing in. */
+  label(): string | null;
+  /** Signs in (in the browser) and picks an account. */
+  connect(): Promise<void>;
+  disconnect(): void;
+  /** Called when the account signs in or out, also on its own (an expired sign-in). */
+  onChange(fn: () => void): void;
+}
+
 /**
  * A source of candle data.
  *
@@ -56,6 +68,9 @@ export interface DataProvider {
    * Returns a function that stops the subscription.
    */
   subscribe?(symbol: string, tf: Timeframe, onCandle: (candle: Candle) => void): () => void;
+
+  /** Present when the source needs the person to sign in first. */
+  readonly account?: BrokerAccount;
 
   /** Optional symbol search for the symbol box. Best matches first. */
   searchSymbols?(query: string): Promise<SymbolInfo[]>;

@@ -76,6 +76,7 @@ your machine.
 | Source | Markets | Notes |
 | --- | --- | --- |
 | **Binance (crypto)** | Crypto | Spot market. Public data, no account or API key. Live updates. |
+| **cTrader** (desktop app) | Whatever your broker offers: forex, metals, indices, commodities | Your own broker's prices, live. Sign in with your cTrader ID (a free demo account works). Read-only. |
 | **Bybit TradFi** | Forex (EUR/USD, GBP/USD, USD/JPY…), gold, silver, oil, US stocks and ETFs | Perpetual futures. Public data, no account. Live updates. |
 | **Binance TradFi** | Gold, silver, oil, US, Hong Kong and Korean stocks | Perpetual futures. Public data, no account. Live updates. |
 | **CSV file** | Anything | MetaTrader 5 exports and most generic OHLC CSVs. Higher timeframes are built from the file. |
@@ -144,6 +145,21 @@ npm run desktop:build    # makes the installer for this computer (in src-tauri/t
 Installers for both systems are built on GitHub: push a version tag (`git tag v0.3.0 && git push --tags`)
 and they appear in a draft release, or run **Actions → Desktop app → Run workflow** for a test build.
 
+### cTrader in your own build
+
+The cTrader source needs a cTrader Open API app ([openapi.ctrader.com](https://openapi.ctrader.com/apps),
+redirect URL `http://localhost:5174/callback`). Its id and secret are built into the desktop app but
+never kept in the repository: put them in `src-tauri/.ctrader.env` (git ignores it),
+
+```
+CTRADER_CLIENT_ID=...
+CTRADER_CLIENT_SECRET=...
+```
+
+or, for the installers built on GitHub, in the repository's secrets `CTRADER_CLIENT_ID` and
+`CTRADER_CLIENT_SECRET` (Settings → Secrets and variables → Actions). Without them the app works
+as before and cTrader says it isn't set up.
+
 ## Adding a data source
 
 Every data source implements one small interface, `DataProvider` in
@@ -186,6 +202,7 @@ src-tauri/                   desktop app (Tauri): window, installers, save dialo
 
 - [x] Forex, gold and stocks without an account (Bybit and Binance perpetual futures)
 - [x] Export/import drawings (Settings → Backup)
+- [x] cTrader: your own broker's prices (desktop app)
 - [ ] FOREX.com data with your own account
 - [ ] More timeframes and chart types
 - [x] Desktop app (Tauri) for Windows and macOS

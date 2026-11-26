@@ -4,6 +4,7 @@ import {
   createChart,
   CrosshairMode,
   HistogramSeries,
+  LineStyle,
   PriceScaleMode,
   TickMarkType,
   type CandlestickData,
@@ -14,7 +15,7 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import type { Candle } from '../types';
-import { defaultAppearance, effectiveTextColor, THEMES, withAlpha, type Appearance, type ThemeColors } from './appearance';
+import { contrastText, defaultAppearance, effectiveTextColor, THEMES, withAlpha, type Appearance, type ThemeColors } from './appearance';
 
 /**
  * Owns the chart, the candle and volume series, and the mapping between
@@ -84,6 +85,12 @@ export class ChartController {
       grid: {
         vertLines: { visible: a.gridVert, color: a.gridColor },
         horzLines: { visible: a.gridHorz, color: a.gridColor },
+      },
+      // A quiet crosshair: thin solid lines in the text color, mostly see-through, so it shows
+      // where the mouse is without competing with the candles (dashes looked like moving chains).
+      crosshair: {
+        vertLine: { color: withAlpha(contrastText(a.background), 0.28), width: 1, style: LineStyle.Solid },
+        horzLine: { color: withAlpha(contrastText(a.background), 0.28), width: 1, style: LineStyle.Solid },
       },
       // No border lines between the chart and its axes: a cleaner, more modern look.
       rightPriceScale: { borderVisible: false },

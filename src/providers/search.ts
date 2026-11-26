@@ -22,8 +22,9 @@ export function mergeResults(query: string, lists: SymbolInfo[][]): SymbolInfo[]
   const q = query.trim().toUpperCase();
   if (!q) return lists.flatMap((list, i) => list.slice(0, i === 0 ? EMPTY_FIRST : EMPTY_OTHERS));
 
-  // "xau" or "btc" means the USDT market of that name above all.
-  const exact = (sym: string) => sym === q || sym === `${q}USDT`;
+  // "xau" or "btc" means the market of that name against the dollar above all
+  // (XAUUSD at a broker, XAUUSDT at an exchange).
+  const exact = (sym: string) => sym === q || sym === `${q}USD` || sym === `${q}USDT`;
   const tier = (s: SymbolInfo) => (exact(s.symbol) ? 0 : s.symbol.startsWith(q) ? 1 : 2);
   const ranked: { item: SymbolInfo; tier: number; rank: number; source: number }[] = [];
   lists.forEach((list, source) => {

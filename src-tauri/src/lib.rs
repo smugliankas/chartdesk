@@ -1,6 +1,8 @@
 //! ChartDesk desktop app: the same web app in a native window, plus what a browser page
-//! can't do on its own: saving files through a real "Save as" dialog, and opening links in
-//! the person's own browser.
+//! can't do on its own: saving files through a real "Save as" dialog, opening links in the
+//! person's own browser, and signing in to cTrader (see ctrader.rs).
+
+mod ctrader;
 
 use tauri::ipc::{InvokeBody, Request};
 use tauri_plugin_dialog::DialogExt;
@@ -41,7 +43,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![save_file])
+        .invoke_handler(tauri::generate_handler![save_file, ctrader::ctrader_app, ctrader::ctrader_login])
         .run(tauri::generate_context!())
         .expect("error while running ChartDesk");
 }

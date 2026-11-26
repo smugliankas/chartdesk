@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- The alert bell next to the price scale is a little bigger and disappears the moment the
+  mouse reaches the price scale, like TradingView's.
+- Calmer crosshair: thin solid lines in the theme's text color, mostly see-through, instead of
+  bold dashes. Over the chart the crosshair is the cursor (no mouse pointer on top of it, which
+  sat up to half a bar away from the line snapped to the candles).
+- Softer alert lines: short, see-through dashes.
+- cTrader as a data source in the desktop app: prices straight from your own broker
+  (Pepperstone, IC Markets and other cTrader brokers), live and without delay, with history.
+  Click **Connect cTrader**, sign in with your cTrader ID in the browser, and the app uses
+  your account (a free demo account works). Symbols from cTrader also show up in the search
+  across all sources. Read-only: ChartDesk never places orders.
 - Select several drawings at once, like TradingView: ⌘/Ctrl + click adds a drawing to the
   selection (or takes it out), ⌘/Ctrl + drag selects every drawing in an area, ⌘/Ctrl + A
   selects them all. Delete removes them, dragging one moves them all, the arrow keys move

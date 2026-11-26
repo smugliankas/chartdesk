@@ -60,3 +60,15 @@ export function openLinksInBrowser(): void {
     void import('@tauri-apps/plugin-opener').then(({ openUrl }) => openUrl(a.href));
   });
 }
+
+/** What the cTrader source needs from the desktop app: the app credentials and the browser sign-in. */
+export const desktopCTrader = {
+  async app(): Promise<{ clientId: string; clientSecret: string } | null> {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('ctrader_app');
+  },
+  async login(): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('ctrader_login');
+  },
+};

@@ -122,16 +122,17 @@ export class AlertsPrimitive implements ISeriesPrimitive<Time> {
         // Alerts on a drawing need no extra line: the drawing is already there.
         if (!alert.drawingId) {
           ctx.save();
-          ctx.strokeStyle = withAlpha(color, 0.55);
+          // Softer than the candles and drawings: short dashes, mostly see-through.
+          ctx.strokeStyle = withAlpha(color, 0.35);
           ctx.lineWidth = 1;
-          ctx.setLineDash([6, 4]);
+          ctx.setLineDash([3, 4]);
           ctx.beginPath();
           ctx.moveTo(0, yy);
           ctx.lineTo(mediaSize.width - 22, yy);
           ctx.stroke();
           ctx.restore();
         }
-        drawBellBadge(ctx, mediaSize.width - 12, yy, color, background);
+        drawBellBadge(ctx, mediaSize.width - 12, yy, withAlpha(color, 0.8), background);
       }
     });
   }

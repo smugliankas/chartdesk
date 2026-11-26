@@ -306,6 +306,10 @@ button.icon svg {
 #chart {
   position: absolute;
   inset: 0;
+  /* No pointer over the chart: the crosshair lines are the cursor, as in TradingView (a system
+     cross next to them was off by up to half a bar, since the vertical line snaps to candles).
+     Drawings under the mouse still show their own cursor. */
+  cursor: none;
 }
 
 #legend {
@@ -843,8 +847,8 @@ button.link:hover:not(:disabled) {
 .price-alert {
   position: absolute;
   z-index: 4;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -853,8 +857,8 @@ button.link:hover:not(:disabled) {
 }
 
 .price-alert svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 /* The chart gets the mouse through the bell (see main.ts); .hover stands in for :hover. */
@@ -2005,4 +2009,33 @@ body.light #timeframes {
 button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.3);
+}
+
+/* --- Signing in to a source (cTrader) ----------------------------------------------- */
+
+#accountButton {
+  gap: 7px;
+  white-space: nowrap;
+}
+
+/* Not signed in: the way forward, in the accent color. */
+#accountButton.account-connect,
+#accountButton.account-connect:hover:not(:disabled) {
+  background: var(--active-bg), var(--bg);
+  border-color: var(--active-border);
+  color: var(--active-text);
+}
+
+/* Signed in: which account, with a small green dot. */
+#accountButton.account-chip {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#accountButton.account-chip::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gain);
 }

@@ -48,6 +48,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const providerSelect = $<HTMLSelectElement>('provider');
 const symbolInput = $<HTMLInputElement>('symbol');
 const csvButton = $<HTMLLabelElement>('csvButton');
+const accountButton = $<HTMLButtonElement>('accountButton');
 const csvFile = $<HTMLInputElement>('csvFile');
 const tfGroup = $<HTMLDivElement>('timeframes');
 const sidebar = $<HTMLElement>('sidebar');
@@ -263,6 +264,64 @@ function syncProviderUi(): void {
   symbolInput.disabled = !provider.freeSymbolInput;
   csvButton.classList.toggle('hidden', provider.id !== csv.id);
   providerSelect.title = provider.description ?? 'Data source';
+  syncAccountUi();
+}
+
+// --- sources that need signing in (cTrader) -------------------------------------------
+
+/** Name of the current source without the part in brackets: "cTrader". */
+const sourceName = () => provider.name.replace(/\s*\(.*\)$/, '');
+
+function syncAccountUi(): void {
+  const account = provider.account;
+  accountButton.classList.toggle('hidden', !account);
+  if (!account) return;
+  const connected = account.isConnected();
+  accountButton.textContent = connected ? (account.label() ?? sourceName()) : `Connect ${sourceName()}`;
+  accountButton.classList.toggle('account-chip', connected);
+  accountButton.classList.toggle('account-connect', !connected);
+  accountButton.dataset.tip = connected
+    ? `Signed in to ${sourceName()}. Click to disconnect.`
+    : `Sign in with your ${sourceName()} ID in your browser`;
+  accountButton.removeAttribute('title');
+}
+
+async function connectAccount(): Promise<void> {
+  const account = provider.account;
+  if (!account) return;
+  accountButton.disabled = true;
+  setStatus(`Sign in to ${sourceName()} in your browser, then come back here…`);
+  try {
+    await account.connect();
+    syncAccountUi();
+    setStatus(`Connected: ${account.label() ?? sourceName()}`);
+    void load();
+  } catch (err) {
+    setStatus(errorMessage(err), true);
+  } finally {
+    accountButton.disabled = false;
+  }
+}
+
+accountButton.addEventListener('click', () => {
+  const account = provider.account;
+  if (!account) return;
+  if (!account.isConnected()) return void connectAccount();
+  void confirmDialog({
+    title: `Disconnect ${account.label() ?? sourceName()}?`,
+    message: `ChartDesk will forget this sign-in. Your drawings stay; connect again any time to see these charts.`,
+    confirmLabel: 'Disconnect',
+  }).then((ok) => {
+    if (ok) account.disconnect();
+  });
+});
+
+for (const p of PROVIDERS) {
+  p.account?.onChange(() => {
+    if (p !== provider) return;
+    syncAccountUi();
+    if (!p.account!.isConnected()) void load(); // shows the "connect" message
+  });
 }
 
 function syncTimeframeUi(): void {
@@ -584,6 +643,12 @@ function hidePriceAlertButtonSoon(): void {
   }, 400);
 }
 
+/** Gone at once, like TradingView's: the moment the mouse reaches the price scale. */
+function hidePriceAlertButtonNow(): void {
+  clearTimeout(priceAlertHideTimer);
+  priceAlertButton.classList.add('hidden');
+}
+
 function placePriceAlertButton(y: number | null): void {
   const price = y === null ? null : cc.yToPrice(y);
   if (y === null || price === null || !provider.subscribe || drawings.currentTool !== 'cursor' || hoveringAlertLine) {
@@ -592,7 +657,7 @@ function placePriceAlertButton(y: number | null): void {
   }
   clearTimeout(priceAlertHideTimer);
   priceAlertPrice = price;
-  priceAlertButton.style.top = `${Math.round(y) - 11}px`;
+  priceAlertButton.style.top = `${Math.round(y) - 13}px`;
   priceAlertButton.style.right = `${cc.priceScaleWidth() + 4}px`;
   priceAlertButton.setAttribute('aria-label', `Add alert at ${cc.formatPrice(price)}`);
   priceAlertButton.classList.remove('hidden');
@@ -614,7 +679,19 @@ function setPriceAlertHover(on: boolean): void {
   if (!on) hidePriceAlertButtonSoon();
 }
 let priceAlertPress = false;
-chartWrap.addEventListener('mousemove', (e) => setPriceAlertHover(overPriceAlertButton(e)), true);
+chartWrap.addEventListener(
+  'mousemove',
+  (e) => {
+    const x = e.clientX - chartEl.getBoundingClientRect().left;
+    if (x > cc.paneSize().width) {
+      setPriceAlertHover(false);
+      hidePriceAlertButtonNow();
+      return;
+    }
+    setPriceAlertHover(overPriceAlertButton(e));
+  },
+  true,
+);
 chartWrap.addEventListener('mouseleave', () => setPriceAlertHover(false));
 chartWrap.addEventListener(
   'mousedown',
@@ -852,6 +929,12 @@ async function load(): Promise<void> {
   historyLoading = false;
   historyDone = false;
   syncTimeframeUi();
+  if (provider.account && !provider.account.isConnected()) {
+    cc.setData([], TF_SECONDS[timeframe]);
+    showLegend(undefined);
+    setStatus(`Connect your ${sourceName()} account to see its charts: the button next to the symbol.`);
+    return;
+  }
   setStatus(`Loading ${symbol} ${TF_LABELS[timeframe]}…`);
   const done = startLoading();
   if (cc.barCount > 0) chartEl.classList.add('loading');
@@ -936,7 +1019,7 @@ cc.chart.subscribeCrosshairMove((param) => {
   crosshairActive = !!bar;
   crosshairY = param.point ? param.point.y : null;
   crosshairPrice = crosshairY === null ? null : cc.yToPrice(crosshairY);
-  placePriceAlertButton(param.point ? param.point.y : null);
+  placePriceAlertButton(crosshairY);
   showLegend(bar ? { time: bar.time as number, open: bar.open, high: bar.high, low: bar.low, close: bar.close } : cc.lastCandle);
 });
 

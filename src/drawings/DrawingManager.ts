@@ -261,7 +261,8 @@ export class DrawingManager implements DrawingSource {
       this.selectedId = null;
       this.measure = null;
     }
-    this.container.style.cursor = tool === 'cursor' ? '' : 'crosshair';
+    // The crosshair lines are the cursor (see #chart in style.css), with drawing tools too.
+    this.container.style.cursor = '';
     this.syncCrosshairMagnet();
     this.listeners.tool.forEach((fn) => fn(tool));
     this.changed();

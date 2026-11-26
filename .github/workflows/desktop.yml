@@ -51,6 +51,10 @@ jobs:
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # cTrader Open API app, built into the app (see src-tauri/build.rs). Repository
+          # secrets: Settings → Secrets and variables → Actions. Without them cTrader is off.
+          CTRADER_CLIENT_ID: ${{ secrets.CTRADER_CLIENT_ID }}
+          CTRADER_CLIENT_SECRET: ${{ secrets.CTRADER_CLIENT_SECRET }}
         with:
           # Only a tag makes a release; a run by hand just builds.
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
