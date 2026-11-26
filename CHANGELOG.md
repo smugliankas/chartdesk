@@ -5,8 +5,9 @@
 - The alert bell next to the price scale is a little bigger and disappears the moment the
   mouse reaches the price scale, like TradingView's.
 - Calmer crosshair: thin solid lines in the theme's text color, mostly see-through, instead of
-  bold dashes. Over the chart the crosshair is the cursor (no mouse pointer on top of it, which
-  sat up to half a bar away from the line snapped to the candles).
+  bold dashes. Over the chart the cursor is a small cross drawn exactly where the crosshair
+  lines meet (the system cross sat up to half a bar beside the line, which snaps to candles);
+  it follows the magnet too.
 - Softer alert lines: short, see-through dashes.
 - cTrader as a data source in the desktop app: prices straight from your own broker
   (Pepperstone, IC Markets and other cTrader brokers), live and without delay, with history.

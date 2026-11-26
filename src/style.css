@@ -306,8 +306,8 @@ button.icon svg {
 #chart {
   position: absolute;
   inset: 0;
-  /* No pointer over the chart: the crosshair lines are the cursor, as in TradingView (a system
-     cross next to them was off by up to half a bar, since the vertical line snaps to candles).
+  /* No mouse pointer over the chart: main.ts draws a cross exactly where the crosshair lines
+     meet (a system cross sat up to half a bar beside the vertical line, which snaps to candles).
      Drawings under the mouse still show their own cursor. */
   cursor: none;
 }
@@ -873,6 +873,24 @@ button.link:hover:not(:disabled) {
 
 #chartWrap.over-alert-button canvas {
   cursor: pointer !important;
+}
+
+/* The cursor over the chart (main.ts): a cross in the chart's text color with a thin outline in
+   its background color, so it reads over candles and lines alike. */
+.cross-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: 21px;
+  height: 21px;
+  color: var(--chart-text);
+  --cross-halo: var(--chart-bg);
+  pointer-events: none;
+}
+
+.cross-cursor svg {
+  display: block;
 }
 
 /* Label shown when hovering an alert line: price and a delete button. */

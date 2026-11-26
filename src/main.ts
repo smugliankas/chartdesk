@@ -169,6 +169,7 @@ function applyAppearance(a: Appearance): void {
   document.body.style.setProperty('--up', a.upColor);
   document.body.style.setProperty('--down', a.downColor);
   document.body.style.setProperty('--chart-text', effectiveTextColor(a));
+  document.body.style.setProperty('--chart-bg', a.background);
   volumeButton.classList.toggle('active', a.showVolume);
   drawings.redraw();
   syncCountdown();
@@ -1020,8 +1021,27 @@ cc.chart.subscribeCrosshairMove((param) => {
   crosshairY = param.point ? param.point.y : null;
   crosshairPrice = crosshairY === null ? null : cc.yToPrice(crosshairY);
   placePriceAlertButton(crosshairY);
+  placeCrossCursor(param.point, param.logical as number | undefined);
   showLegend(bar ? { time: bar.time as number, open: bar.open, high: bar.high, low: bar.low, close: bar.close } : cc.lastCandle);
 });
+
+// The cursor over the chart: a small cross drawn where the crosshair lines meet. The mouse
+// pointer itself is hidden there (style.css), since the vertical line snaps to the bar under
+// the mouse and a system cross would sit up to half a bar beside it.
+const crossCursor = $<HTMLDivElement>('crossCursor');
+crossCursor.innerHTML =
+  '<svg width="21" height="21" viewBox="0 0 21 21" aria-hidden="true">' +
+  '<path d="M10.5 0v21M0 10.5h21" stroke="var(--cross-halo)" stroke-width="3"/>' +
+  '<path d="M10.5 0v21M0 10.5h21" stroke="currentColor" stroke-width="1"/></svg>';
+
+function placeCrossCursor(point: { x: number; y: number } | undefined, logical: number | undefined): void {
+  // Over a drawing or an alert line the mouse shows its own cursor (move, resize) instead.
+  const center = point && !chartEl.style.cursor ? cc.crosshairCenter(point, logical) : null;
+  crossCursor.classList.toggle('hidden', !center);
+  if (center) crossCursor.style.transform = `translate(${Math.round(center.x) - 10}px, ${Math.round(center.y) - 10}px)`;
+}
+
+chartWrap.addEventListener('mouseleave', () => crossCursor.classList.add('hidden'));
 
 function showLegend(c: Candle | undefined): void {
   if (!c) {

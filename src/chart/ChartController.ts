@@ -231,9 +231,31 @@ export class ChartController {
     return this.candles.priceScale().options().autoScale;
   }
 
+  private magnet = false;
+
   /** With the magnet on, the crosshair snaps to the nearest open, high, low or close. */
   setCrosshairMagnet(on: boolean): void {
+    this.magnet = on;
     this.chart.applyOptions({ crosshair: { mode: on ? CrosshairMode.MagnetOHLC : CrosshairMode.Normal } });
+  }
+
+  /**
+   * Where the crosshair lines cross, in pane pixels: the vertical line sits on the bar under the
+   * mouse (not the mouse itself), the horizontal one on the mouse, or with the magnet on the
+   * nearest open/high/low/close of that bar.
+   */
+  crosshairCenter(point: { x: number; y: number }, logical: number | undefined): { x: number; y: number } | null {
+    if (logical === undefined) return null;
+    const x = this.chart.timeScale().logicalToCoordinate(logical as Logical);
+    if (x === null) return null;
+    let y = point.y;
+    const c = this.magnet ? this.candleAt(Math.round(logical)) : undefined;
+    const price = this.yToPrice(point.y);
+    if (c && price !== null) {
+      const snapped = [c.open, c.high, c.low, c.close].reduce((best, v) => (Math.abs(v - price) < Math.abs(best - price) ? v : best));
+      y = this.priceToY(snapped) ?? y;
+    }
+    return { x, y };
   }
 
   /** Turning auto-scale off keeps the current price range where it is. */
