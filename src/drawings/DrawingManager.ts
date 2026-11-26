@@ -76,6 +76,8 @@ export class DrawingManager implements DrawingSource {
   /** Box being dragged out with ⌘/Ctrl to select drawings. */
   selectBox: SelectBox | null = null;
   editingId: string | null = null;
+  /** The drawing under the mouse, for drawings that show more while pointed at. */
+  hoveredId: string | null = null;
   measure: { p1: Point; p2: Point } | null = null;
   hidden = false;
   /** The chart's timeframe, for drawings shown only on some timeframes. */
@@ -122,6 +124,7 @@ export class DrawingManager implements DrawingSource {
     // from panning the chart while drawing or dragging a drawing.
     container.addEventListener('mousedown', this.onMouseDown, true);
     container.addEventListener('mousemove', this.onHover);
+    container.addEventListener('mouseleave', () => this.setHovered(null));
     container.addEventListener('dblclick', this.onDoubleClick, true);
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keydown', this.onModifierKey);
@@ -1064,8 +1067,18 @@ export class DrawingManager implements DrawingSource {
       const hit = this.hitTest(x, y);
       const locked = hit && this.drawings.find((d) => d.id === hit.id)?.locked;
       this.container.style.cursor = !hit ? '' : locked ? 'default' : hit.part === 'body' ? 'move' : 'pointer';
-    }
+      this.setHovered(hit?.id ?? null);
+    } else this.setHovered(null);
   };
+
+  private setHovered(id: string | null): void {
+    if (id === this.hoveredId) return;
+    const was = this.drawings.find((d) => d.id === this.hoveredId);
+    const now = this.drawings.find((d) => d.id === id);
+    this.hoveredId = id;
+    // Only positions look different while pointed at; skip the redraw for the rest.
+    if ([was, now].some((d) => d && (d.type === 'long' || d.type === 'short'))) this.redraw();
+  }
 
   private onDoubleClick = (e: MouseEvent): void => {
     if (this.tool !== 'cursor') return;

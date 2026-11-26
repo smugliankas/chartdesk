@@ -41,6 +41,8 @@ export interface DrawingSource {
   readonly drawings: readonly Drawing[];
   readonly preview: Drawing | null;
   readonly selectedIds: readonly string[];
+  /** The drawing under the mouse (cursor tool only). */
+  readonly hoveredId: string | null;
   /** Box being dragged out with ⌘/Ctrl to select drawings (pane pixels). */
   readonly selectBox: { x1: number; y1: number; x2: number; y2: number } | null;
   /** Hidden while the text is being edited in place. */
@@ -429,7 +431,8 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
 
       case 'long':
       case 'short':
-        this.drawPosition(ctx, d);
+        // Its figures show only while it's pointed at, selected or being drawn.
+        this.drawPosition(ctx, d, selected || d.id === this.source.hoveredId);
         break;
     }
 
@@ -442,7 +445,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
       ctx.setLineDash([]);
       for (const h of handlesOf(d)) {
         const p = this.xy(h.point);
-        if (p) handle(ctx, p.x, p.y, theme.background);
+        if (p) handle(ctx, p.x, p.y, theme.background, squareHandle(d, h.part));
       }
     }
     resetState(ctx);
@@ -600,7 +603,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     label(ctx, text, (left + right) / 2, labelY, where, color);
   }
 
-  private drawPosition(ctx: CanvasRenderingContext2D, d: Position): void {
+  private drawPosition(ctx: CanvasRenderingContext2D, d: Position, showInfo: boolean): void {
     const x1 = this.cc.timeToX(d.entry.time);
     const x2 = this.cc.timeToX(d.endTime);
     const yE = this.cc.priceToY(d.entry.price);
@@ -624,6 +627,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     ctx.strokeStyle = this.cc.themeColors.text;
     ctx.lineWidth = 1;
     line(ctx, left, yE, left + w, yE);
+    if (!showInfo) return;
 
     const entry = d.entry.price;
     const reward = Math.abs(d.tp - entry);
@@ -634,7 +638,8 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     const cx = left + w / 2;
     label(ctx, `Target ${this.cc.formatPrice(d.tp)} (${pct(reward)}%)`, cx, yT, yT < yE ? 'above' : 'below', profit);
     label(ctx, `Stop ${this.cc.formatPrice(d.sl)} (${pct(risk)}%)`, cx, yS, yS < yE ? 'above' : 'below', loss);
-    label(ctx, `${d.type === 'long' ? 'Long' : 'Short'} · R:R ${rr}`, cx, yE, 'center', '#3a4154');
+    // Just under the entry line, so the line itself stays visible.
+    label(ctx, `${d.type === 'long' ? 'Long' : 'Short'} · R:R ${rr}`, cx, yE + 2, 'below', '#3a4154');
   }
 
   private drawMeasure(ctx: CanvasRenderingContext2D, p1: Point, p2: Point): void {
@@ -712,9 +717,18 @@ function arrowHead(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: nu
   ctx.restore();
 }
 
-function handle(ctx: CanvasRenderingContext2D, x: number, y: number, fill: string): void {
+/**
+ * Long/short positions, like TradingView: the target handle and the handle that sets the width
+ * are squares; the entry and stop handles are dots.
+ */
+function squareHandle(d: Drawing, part: string): boolean {
+  return (d.type === 'long' || d.type === 'short') && (part === 'tp' || part === 'end');
+}
+
+function handle(ctx: CanvasRenderingContext2D, x: number, y: number, fill: string, square = false): void {
   ctx.beginPath();
-  ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+  if (square) ctx.rect(Math.round(x) - 4, Math.round(y) - 4, 8, 8);
+  else ctx.arc(x, y, 4.5, 0, Math.PI * 2);
   ctx.fillStyle = fill;
   ctx.fill();
   ctx.lineWidth = 2;

@@ -30,6 +30,9 @@
 - Desktop app for macOS and Windows (Tauri): the same app in its own window. Full screen is
   the window's own; chart images and backups are saved through a real "Save as" dialog; links
   open in your browser. Installers are built on GitHub (Actions → Desktop app), not signed yet.
+- Long/short positions show their target, stop and R:R labels only while pointed at or
+  selected; the R:R label sits just under the entry line so the line stays visible; the
+  target and width handles are squares, as in TradingView.
 - Lines held at 45° with ⇧ (Shift) no longer wobble: the end snaps to a bar first and the
   height follows it exactly.
 - A selected drawing keeps its look and shows its handles (the dots at its points), instead of
