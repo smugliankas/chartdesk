@@ -12,7 +12,8 @@ import {
   showToast,
   unlockAudioOnFirstInteraction,
 } from './alerts/notify';
-import { chooseAndRestoreBackup, downloadBackup, downloadBlob } from './backup';
+import { chooseAndRestoreBackup, downloadBackup } from './backup';
+import { openLinksInBrowser, saveFile } from './desktop';
 import { effectiveTextColor, loadAppearance, readable, saveAppearance, type Appearance } from './chart/appearance';
 import { ChartController } from './chart/ChartController';
 import { BarCountdown } from './chart/countdown';
@@ -175,6 +176,7 @@ function applyAppearance(a: Appearance): void {
 const settingsDialog = createSettingsDialog(() => cc.appearance, applyAppearance, {
   onExport: async () => {
     const s = await downloadBackup();
+    if (!s) return; // "Save as" cancelled
     const n = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
     setStatus(`Backup saved: ${n(s.drawings, 'drawing')} on ${n(s.drawingSymbols.length, 'symbol')}, ${n(s.alerts, 'alert')}.`);
   },
@@ -963,8 +965,7 @@ async function downloadSnapshot(): Promise<void> {
   if (cc.barCount === 0) return;
   try {
     const blob = await canvasToBlob(makeSnapshot());
-    downloadBlob(blob, snapshotFileName(symbol, TF_LABELS[timeframe]));
-    setStatus('Chart image saved.');
+    if (await saveFile(blob, snapshotFileName(symbol, TF_LABELS[timeframe]))) setStatus('Chart image saved.');
   } catch (err) {
     setStatus(errorMessage(err), true);
   }
@@ -1102,6 +1103,7 @@ for (const [key, what] of shortcuts) {
 
 // --- start ----------------------------------------------------------------------------
 
+openLinksInBrowser();
 installTooltips();
 
 syncProviderUi();

@@ -115,6 +115,31 @@ npm run typecheck
 npm test
 ```
 
+## Desktop app
+
+ChartDesk also runs as an app on macOS and Windows: the same app in its own window, with
+a native full screen and a real "Save as" dialog for chart images and backups. Installers are
+on the [Releases](https://github.com/smugliankas/chartdesk/releases) page (a `.dmg` for macOS,
+Apple Silicon and Intel; an `.msi` or `.exe` for Windows).
+
+The builds are not signed yet, so the system warns the first time you open them:
+
+- **macOS:** right-click ChartDesk in Applications and choose **Open**, then **Open** again.
+  If macOS says the app "is damaged", run `xattr -dr com.apple.quarantine /Applications/ChartDesk.app`
+  in Terminal once.
+- **Windows:** on "Windows protected your PC", click **More info**, then **Run anyway**.
+
+To run the desktop app from the source code, install [Rust](https://rustup.rs) once, then:
+
+```bash
+npm install
+npm run desktop          # opens the app; changes to the code show up right away
+npm run desktop:build    # makes the installer for this computer (in src-tauri/target/release/bundle)
+```
+
+Installers for both systems are built on GitHub: push a version tag (`git tag v0.3.0 && git push --tags`)
+and they appear in a draft release, or run **Actions → Desktop app → Run workflow** for a test build.
+
 ## Adding a data source
 
 Every data source implements one small interface, `DataProvider` in
@@ -150,6 +175,7 @@ src/
   alerts/                    price alerts (checking, drawing on the chart, notifications)
   ui/                        toolbar, symbol search, watchlist, menus and dialogs
 tests/                       automated tests (npm test)
+src-tauri/                   desktop app (Tauri): window, installers, save dialog
 ```
 
 ## Roadmap
@@ -158,7 +184,8 @@ tests/                       automated tests (npm test)
 - [x] Export/import drawings (Settings → Backup)
 - [ ] FOREX.com data with your own account
 - [ ] More timeframes and chart types
-- [ ] Desktop app (Tauri) for Windows and macOS
+- [x] Desktop app (Tauri) for Windows and macOS
+- [ ] Desktop: forex history from Dukascopy, notifications from the system
 
 ## License
 

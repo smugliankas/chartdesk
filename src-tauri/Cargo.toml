@@ -1,0 +1,32 @@
+[package]
+name = "chartdesk"
+version = "0.2.0"
+description = "ChartDesk: open-source, local-first charting app"
+authors = ["Ömer Çolak"]
+license = "AGPL-3.0-only"
+repository = "https://github.com/smugliankas/chartdesk"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+# The _lib suffix keeps the library apart from the app binary on Windows.
+name = "chartdesk_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+
+[profile.release]
+# Smaller installers.
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

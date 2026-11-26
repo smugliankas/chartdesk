@@ -1,0 +1,49 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "ChartDesk",
+  "version": "../package.json",
+  "identifier": "io.github.smugliankas.chartdesk",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "ChartDesk",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 560,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Finance",
+    "shortDescription": "Charting app with unlimited drawings",
+    "longDescription": "Open-source, local-first charting app with unlimited drawings. Crypto, forex, gold and stocks from public market data, or your own CSV files.",
+    "copyright": "© 2026 Ömer Çolak. AGPL-3.0.",
+    "license": "AGPL-3.0-only",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-"
+    }
+  }
+}

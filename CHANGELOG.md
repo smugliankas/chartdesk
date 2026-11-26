@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Desktop app for macOS and Windows (Tauri): the same app in its own window. Full screen is
+  the window's own; chart images and backups are saved through a real "Save as" dialog; links
+  open in your browser. Installers are built on GitHub (Actions → Desktop app), not signed yet.
 - Lines held at 45° with ⇧ (Shift) no longer wobble: the end snaps to a bar first and the
   height follows it exactly.
 - A selected drawing keeps its width and gets a soft glow in its own color, with its handles,

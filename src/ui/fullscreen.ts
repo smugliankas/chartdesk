@@ -1,3 +1,4 @@
+import { desktopWindow, IS_DESKTOP } from '../desktop';
 import { IS_MAC } from '../platform';
 import { ICONS } from './tools';
 
@@ -33,6 +34,7 @@ function fullscreenElement(): Element | null {
  * the browser decides.
  */
 export function setupFullscreen(button: HTMLButtonElement, canEscape: () => boolean): { toggle: () => void } {
+  if (IS_DESKTOP) return setupDesktopFullscreen(button, canEscape);
   const root = document.documentElement as WebkitElement;
   const supported = !!(doc.fullscreenEnabled ?? doc.webkitFullscreenEnabled);
   const keyboard = (navigator as Navigator & { keyboard?: KeyboardLock }).keyboard;
@@ -93,5 +95,43 @@ export function setupFullscreen(button: HTMLButtonElement, canEscape: () => bool
   );
 
   sync();
+  return { toggle };
+}
+
+function showState(button: HTMLButtonElement, on: boolean): void {
+  button.innerHTML = on ? ICONS.exitFullscreen : ICONS.fullscreen;
+  button.dataset.tip = on ? `Exit full screen (${FULLSCREEN_KEYS}, Esc)` : `Full screen (${FULLSCREEN_KEYS})`;
+  button.removeAttribute('title');
+  button.classList.toggle('active', on);
+}
+
+/**
+ * The desktop app: the window itself goes full screen. Esc works as in the browser version:
+ * it cancels what is going on first, and leaves full screen only when there is nothing left.
+ */
+function setupDesktopFullscreen(button: HTMLButtonElement, canEscape: () => boolean): { toggle: () => void } {
+  let on = false;
+  const sync = async () => {
+    on = await desktopWindow.isFullscreen();
+    showState(button, on);
+  };
+  const set = async (want: boolean) => {
+    await desktopWindow.setFullscreen(want);
+    await sync();
+  };
+  const toggle = () => void set(!on);
+
+  button.addEventListener('click', toggle);
+  // Also catches the window's own full-screen button (the green one on a Mac).
+  void desktopWindow.onResized(() => void sync());
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (e.key === 'Escape' && on && !canEscape()) void set(false);
+    },
+    true,
+  );
+  showState(button, false);
+  void sync();
   return { toggle };
 }

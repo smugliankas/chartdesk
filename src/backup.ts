@@ -7,6 +7,7 @@ import type { Drawing } from './drawings/model';
 import { formatDateTime } from './format';
 import { allDrawings, DRAWINGS_PREFIX, flushDrawings, replaceDrawings } from './drawings/storage';
 import { confirmDialog } from './ui/confirmDialog';
+import { saveFile } from './desktop';
 
 const PREFIX = 'chartdesk:';
 /** Keys from before the project was named ChartDesk. */
@@ -127,24 +128,16 @@ function countArray(raw: string): number {
 
 // --- browser side -------------------------------------------------------------
 
-/** Downloads the backup as chartdesk-backup-YYYY-MM-DD.json. */
-export async function downloadBackup(): Promise<BackupSummary> {
+/**
+ * Saves the backup as chartdesk-backup-YYYY-MM-DD.json (a download in the browser, a "Save as"
+ * dialog in the desktop app). Resolves null when the person cancels the dialog.
+ */
+export async function downloadBackup(): Promise<BackupSummary | null> {
   await flushDrawings();
   const backup = collectBackup(localStorage, new Date(), allDrawings());
   const day = backup.exportedAt.slice(0, 10);
-  downloadBlob(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }), `chartdesk-backup-${day}.json`);
-  return summarize(backup);
-}
-
-export function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  const saved = await saveFile(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }), `chartdesk-backup-${day}.json`);
+  return saved ? summarize(backup) : null;
 }
 
 /** Lets the user pick a backup file and restores it after asking. Reloads the page when done. */
