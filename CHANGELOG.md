@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## v0.3.0
+
+cTrader (desktop app), drawing templates and labels, multi-select, a smoother crosshair,
+and the desktop app for macOS and Windows.
 
 - Drawing templates: save a drawing's look as a named template, e.g. a dashed rectangle
   called "FVG" or a dotted line called "Liquidity", and give it to any other drawing of that
