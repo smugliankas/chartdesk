@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.1
+
+- cTrader: the live candle now moves with every price. cTrader sends the forming bar without a
+  close (the close is the latest bid) and names its timeframe ("H1"); the chart used to stay at
+  the price it was loaded with, so each timeframe showed a different last price.
+
 ## v0.3.0
 
 cTrader (desktop app), drawing templates and labels, multi-select, a smoother crosshair,

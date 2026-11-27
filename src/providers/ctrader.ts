@@ -47,6 +47,25 @@ export const PT = {
 /** ProtoOATrendbarPeriod for each of our timeframes. */
 export const PERIODS: Record<Timeframe, number> = { '1m': 1, '5m': 5, '15m': 7, '30m': 8, '1h': 9, '4h': 10, '1d': 12, '1w': 13, '1M': 14 };
 
+const PERIOD_NAMES: Record<string, number> = {
+  M1: 1, M2: 2, M3: 3, M4: 4, M5: 5, M10: 6, M15: 7, M30: 8, H1: 9, H4: 10, H12: 11, D1: 12, W1: 13, MN1: 14,
+};
+
+/**
+ * A trendbar's period as a number. The JSON API may send the enum's name ("H1") or its number,
+ * and leaves it out for the default, M1.
+ */
+export function periodOf(tb: RawTrendbar): number {
+  const p = tb.period;
+  if (p === undefined) return 1;
+  return typeof p === 'number' ? p : (PERIOD_NAMES[p] ?? -1);
+}
+
+/** Length of a bar in seconds, by period (a month counts as 31 days). */
+const PERIOD_SECONDS: Record<number, number> = {
+  1: 60, 2: 120, 3: 180, 4: 240, 5: 300, 6: 600, 7: 900, 8: 1800, 9: 3600, 10: 14_400, 11: 43_200, 12: 86_400, 13: 604_800, 14: 2_678_400,
+};
+
 /** The longest time range one trendbar request may cover, by period (from Spotware's own SDK). */
 export function maxRangeMs(period: number): number {
   if (period <= 5) return 302_400_000; // M1–M5: 3.5 days
@@ -58,7 +77,7 @@ export function maxRangeMs(period: number): number {
 /** A bar as the API sends it: prices in 1/100000, as a low plus deltas. */
 export interface RawTrendbar {
   volume?: number;
-  period?: number;
+  period?: number | string;
   low?: number;
   deltaOpen?: number;
   deltaClose?: number;
@@ -211,9 +230,53 @@ export class CTraderProvider implements DataProvider {
       const digits = await this.digitsOf(s.symbolId);
       if (stopped) return;
       const period = PERIODS[tf];
+      // The live bar comes without a close: its close is the latest bid. The bar itself comes when
+      // it opens (and now and then); every bid in between moves its close, high and low. Until the
+      // first one arrives, the newest bar from the history stands in for it.
+      let bar: Candle | null = null;
+      let bid: number | undefined;
+      let seeding = false;
+      const len = PERIOD_SECONDS[period];
+      const emit = () => {
+        if (!bar || stopped) return;
+        if (bid !== undefined) bar.close = bid;
+        bar.high = Math.max(bar.high, bar.close);
+        bar.low = Math.min(bar.low, bar.close);
+        onCandle({ ...bar });
+      };
       const listener = (e: SpotEvent) => {
         if (e.symbolId !== s.symbolId) return;
-        for (const tb of e.trendbar ?? []) if ((tb.period ?? 1) === period) onCandle(toCandle(tb, digits));
+        if (e.bid !== undefined) bid = Number((e.bid / 100000).toFixed(digits));
+        const tb = (e.trendbar ?? []).find((t) => periodOf(t) === period);
+        if (tb) {
+          const c = toCandle(tb, digits);
+          // The same bar again keeps the extremes the bids already reached.
+          const same = bar !== null && bar.time === c.time;
+          bar = same ? { ...c, high: Math.max(c.high, bar!.high), low: Math.min(c.low, bar!.low) } : c;
+          if (tb.deltaClose === undefined && bid === undefined) bar.close = c.open;
+          emit();
+        } else if (e.bid !== undefined) {
+          const now = Date.now() / 1000;
+          // Up to an hour, bars start on the clock: a bid after the bar's end opens the next one,
+          // should the new bar itself be late.
+          if (bar && period <= 9 && now >= bar.time + len && bid !== undefined) {
+            const time = Math.floor(now / len) * len;
+            bar = { time, open: bid, high: bid, low: bid, close: bid, volume: 0 };
+          }
+          if (bar) emit();
+          else if (!seeding) {
+            seeding = true;
+            void this.bars(symbol, tf, Date.now(), 1)
+              .then((list) => {
+                const last = list.at(-1);
+                // Only the bar still being made; a finished one must not take today's bids.
+                if (last && !bar && last.time + len > Date.now() / 1000) bar = { ...last };
+                emit();
+              })
+              .catch(() => {})
+              .finally(() => (seeding = false));
+          }
+        }
       };
       this.spotListeners.add(listener);
       await this.addSpots(s.symbolId);
@@ -269,7 +332,7 @@ export class CTraderProvider implements DataProvider {
 
   // --- history ------------------------------------------------------------------------
 
-  private async bars(symbol: string, tf: Timeframe, to: number): Promise<Candle[]> {
+  private async bars(symbol: string, tf: Timeframe, to: number, count = PAGE_SIZE): Promise<Candle[]> {
     const s = await this.find(symbol);
     const digits = await this.digitsOf(s.symbolId);
     const period = PERIODS[tf];
@@ -282,7 +345,7 @@ export class CTraderProvider implements DataProvider {
         period,
         fromTimestamp: Math.max(0, end - range),
         toTimestamp: end,
-        count: PAGE_SIZE,
+        count,
       });
       const bars = ((res.trendbar as RawTrendbar[] | undefined) ?? []).map((tb) => toCandle(tb, digits));
       if (bars.length > 0) return bars.sort((a, b) => a.time - b.time);

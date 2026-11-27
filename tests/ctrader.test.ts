@@ -242,6 +242,44 @@ describe('cTrader provider', () => {
     expect(server.types().slice(-2)).toEqual([PT.UNSUBSCRIBE_LIVE_TRENDBAR_REQ, PT.UNSUBSCRIBE_SPOTS_REQ]);
   });
 
+  it('builds the live bar like cTrader sends it: period by name, no close, bids in between', async () => {
+    const { provider, server } = setup({ accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 30 * 86400_000, accountId: 77 });
+    const hour = Math.floor(Date.now() / 3_600_000) * 60; // this hour, in minutes
+    const got: { time: number; open: number; high: number; low: number; close: number }[] = [];
+    const stop = provider.subscribe('EURUSD', '1h', (c) => got.push(c));
+    await tick();
+    await tick();
+    // The bar as it opens: period "H1", low and deltas, but no deltaClose.
+    server.spot({ symbolId: 1, bid: 109_450, trendbar: [{ period: 'H1', utcTimestampInMinutes: hour, low: 109_400, deltaOpen: 20, deltaHigh: 80, volume: 3 }] });
+    expect(got.at(-1)).toMatchObject({ time: hour * 60, open: 1.0942, high: 1.0948, low: 1.094, close: 1.0945 });
+    // Bids alone move the close, and the high or low when they pass them.
+    server.spot({ symbolId: 1, bid: 109_510 });
+    expect(got.at(-1)).toMatchObject({ high: 1.0951, close: 1.0951 });
+    server.spot({ symbolId: 1, bid: 109_300 });
+    expect(got.at(-1)).toMatchObject({ high: 1.0951, low: 1.093, close: 1.093 });
+    // The same bar sent again keeps the extremes the bids reached.
+    server.spot({ symbolId: 1, bid: 109_350, trendbar: [{ period: 'H1', utcTimestampInMinutes: hour, low: 109_400, deltaOpen: 20, deltaHigh: 80, volume: 4 }] });
+    expect(got.at(-1)).toMatchObject({ high: 1.0951, low: 1.093, close: 1.0935 });
+    stop();
+  });
+
+  it('moves the newest bar from the history while no live bar has come yet', async () => {
+    const { provider, server } = setup({ accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 30 * 86400_000, accountId: 77 });
+    const hour = Math.floor(Date.now() / 3_600_000) * 60;
+    server.bars.set(1, [
+      { utcTimestampInMinutes: hour - 60, low: 109_000, deltaOpen: 10, deltaHigh: 50, deltaClose: 20, volume: 9 },
+      { utcTimestampInMinutes: hour, low: 109_100, deltaOpen: 10, deltaHigh: 50, deltaClose: 20, volume: 2 },
+    ]);
+    const got: { time: number; close: number; high: number }[] = [];
+    const stop = provider.subscribe('EURUSD', '1h', (c) => got.push(c));
+    await tick();
+    await tick();
+    server.spot({ symbolId: 1, bid: 109_200 });
+    for (let i = 0; i < 4; i++) await tick();
+    expect(got.at(-1)).toMatchObject({ time: hour * 60, close: 1.092, high: 1.092 });
+    stop();
+  });
+
   it('gives watchlist quotes with the change since the last session close', async () => {
     const { provider, server } = setup({ accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 30 * 86400_000, accountId: 77 });
     const quotes: { symbol: string; price: number; changePct: number; decimals?: number }[] = [];
