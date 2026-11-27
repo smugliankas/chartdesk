@@ -13,6 +13,8 @@ class FakeServer {
   ];
   /** Bars per symbol; trendbar requests get the ones inside their time range. */
   bars = new Map<number, { utcTimestampInMinutes: number; low: number; deltaOpen: number; deltaHigh: number; deltaClose: number; volume: number }[]>();
+  /** Bars of one period ("symbolId:period"), used before `bars` when set. */
+  barsOf = new Map<string, { utcTimestampInMinutes: number; low: number; deltaOpen: number; deltaHigh: number; deltaClose: number; volume: number }[]>();
   fail: Partial<Record<number, string>> = {};
 
   socket(url: string): FakeSocket {
@@ -42,7 +44,7 @@ class FakeServer {
           symbol: (p.symbolId as number[]).map((id) => ({ symbolId: id, digits: id === 41 ? 2 : 5, pipPosition: 4 })),
         });
       case PT.GET_TRENDBARS_REQ: {
-        const all = this.bars.get(p.symbolId as number) ?? [];
+        const all = this.barsOf.get(`${p.symbolId}:${p.period}`) ?? this.bars.get(p.symbolId as number) ?? [];
         const inRange = all.filter((b) => b.utcTimestampInMinutes * 60000 >= (p.fromTimestamp as number) && b.utcTimestampInMinutes * 60000 <= (p.toTimestamp as number));
         return reply(PT.GET_TRENDBARS_RES, { period: p.period, trendbar: inRange.slice(-(p.count as number)) });
       }
@@ -261,6 +263,23 @@ describe('cTrader provider', () => {
     server.spot({ symbolId: 1, bid: 109_350, trendbar: [{ period: 'H1', utcTimestampInMinutes: hour, low: 109_400, deltaOpen: 20, deltaHigh: 80, volume: 4 }] });
     expect(got.at(-1)).toMatchObject({ high: 1.0951, low: 1.093, close: 1.0935 });
     stop();
+  });
+
+  it('adds the bar being made to the history, built from 1-minute bars', async () => {
+    const { provider, server } = setup({ accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 30 * 86400_000, accountId: 77 });
+    const hour = Math.floor(Date.now() / 3_600_000) * 60;
+    server.barsOf.set('1:9', [
+      { utcTimestampInMinutes: hour - 120, low: 109_000, deltaOpen: 10, deltaHigh: 50, deltaClose: 20, volume: 9 },
+      { utcTimestampInMinutes: hour - 60, low: 109_000, deltaOpen: 10, deltaHigh: 50, deltaClose: 20, volume: 9 },
+    ]);
+    server.barsOf.set('1:1', [
+      { utcTimestampInMinutes: hour - 1, low: 108_000, deltaOpen: 0, deltaHigh: 0, deltaClose: 0, volume: 1 }, // last hour: left out
+      { utcTimestampInMinutes: hour, low: 109_100, deltaOpen: 10, deltaHigh: 30, deltaClose: 20, volume: 2 },
+      { utcTimestampInMinutes: hour + 1, low: 109_050, deltaOpen: 20, deltaHigh: 90, deltaClose: 60, volume: 3 },
+    ]);
+    const candles = await provider.getCandles('EURUSD', '1h');
+    expect(candles).toHaveLength(3);
+    expect(candles.at(-1)).toEqual({ time: hour * 60, open: 1.0911, high: 1.0914, low: 1.0905, close: 1.0911, volume: 5 });
   });
 
   it('moves the newest bar from the history while no live bar has come yet', async () => {

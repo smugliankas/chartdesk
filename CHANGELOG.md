@@ -5,6 +5,9 @@
 - cTrader: the live candle now moves with every price. cTrader sends the forming bar without a
   close (the close is the latest bid) and names its timeframe ("H1"); the chart used to stay at
   the price it was loaded with, so each timeframe showed a different last price.
+- cTrader: the newest candle is there as soon as the chart opens. cTrader's history stops at the
+  last finished bar, so the one being made is built from the 1-minute bars under it (5-minute
+  for days) instead of waiting for the first live message.
 
 ## v0.3.0
 

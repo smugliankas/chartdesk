@@ -204,8 +204,52 @@ export class CTraderProvider implements DataProvider {
 
   // --- DataProvider -----------------------------------------------------------------
 
-  getCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
-    return this.bars(symbol, tf, Date.now());
+  async getCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
+    // cTrader's history ends with the last finished bar; the one being made comes with the first
+    // live message, a moment later. So it is built here at once from the smaller bars under it.
+    const [bars, forming] = await Promise.all([this.bars(symbol, tf, Date.now()), this.formingBar(symbol, tf).catch(() => null)]);
+    const last = bars.at(-1);
+    const len = PERIOD_SECONDS[PERIODS[tf]];
+    // Only when the history's bars sit on the same clock (a broker could start days elsewhere).
+    if (forming && last && last.time % len !== 0) return bars;
+    if (forming && (!last || forming.time > last.time)) bars.push(forming);
+    else if (forming && last && forming.time === last.time) bars[bars.length - 1] = forming;
+    return bars;
+  }
+
+  /**
+   * The bar still being made, from the 1-minute bars since it started (5-minute bars for a day).
+   * Not for 1-minute charts (nothing smaller) or weeks and months (their start depends on the broker).
+   */
+  private async formingBar(symbol: string, tf: Timeframe): Promise<Candle | null> {
+    const lower: Partial<Record<Timeframe, number>> = { '5m': 1, '15m': 1, '30m': 1, '1h': 1, '4h': 1, '1d': 5 };
+    const sub = lower[tf];
+    if (!sub) return null;
+    const len = PERIOD_SECONDS[PERIODS[tf]];
+    const start = Math.floor(Date.now() / 1000 / len) * len;
+    const s = await this.find(symbol);
+    const digits = await this.digitsOf(s.symbolId);
+    const res = await this.request(PT.GET_TRENDBARS_REQ, {
+      ctidTraderAccountId: this.accountId(),
+      symbolId: s.symbolId,
+      period: sub,
+      fromTimestamp: start * 1000,
+      toTimestamp: Date.now(),
+      count: PAGE_SIZE,
+    });
+    const parts = ((res.trendbar as RawTrendbar[] | undefined) ?? [])
+      .map((tb) => toCandle(tb, digits))
+      .filter((c) => c.time >= start)
+      .sort((a, b) => a.time - b.time);
+    if (parts.length === 0) return null;
+    return {
+      time: start,
+      open: parts[0].open,
+      high: Math.max(...parts.map((c) => c.high)),
+      low: Math.min(...parts.map((c) => c.low)),
+      close: parts[parts.length - 1].close,
+      volume: parts.reduce((sum, c) => sum + (c.volume ?? 0), 0),
+    };
   }
 
   getCandlesBefore(symbol: string, tf: Timeframe, beforeTime: number): Promise<Candle[]> {
@@ -266,11 +310,9 @@ export class CTraderProvider implements DataProvider {
           if (bar) emit();
           else if (!seeding) {
             seeding = true;
-            void this.bars(symbol, tf, Date.now(), 1)
-              .then((list) => {
-                const last = list.at(-1);
-                // Only the bar still being made; a finished one must not take today's bids.
-                if (last && !bar && last.time + len > Date.now() / 1000) bar = { ...last };
+            void this.formingBar(symbol, tf)
+              .then((forming) => {
+                if (forming && !bar) bar = forming;
                 emit();
               })
               .catch(() => {})
