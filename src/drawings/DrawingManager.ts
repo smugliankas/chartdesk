@@ -6,7 +6,12 @@ import { distToPolyline, distToSegment, extendSegment, handlesOf, insideChannel,
 import {
   DEFAULT_COLORS,
   DEFAULT_FONT_SIZE,
+  DEFAULT_LABEL_POS,
+  DEFAULT_LABEL_SIZE,
+  DEFAULT_LOSS_COLOR,
+  DEFAULT_PROFIT_COLOR,
   DEFAULT_WIDTH,
+  FIB_LEVELS,
   fibLevelsOf,
   fibPrice,
   fibShowsTrendLine,
@@ -260,7 +265,8 @@ export class DrawingManager implements DrawingSource {
     const n = name.trim();
     if (!d || !n) return;
     const list = this.templatesFor(d.type).filter((t) => t.name !== n);
-    this.templates = { ...this.templates, [d.type]: [...list, { name: n, style: styleOf(d) }] };
+    // The whole look, defaults included: a thin solid line is part of a template too.
+    this.templates = { ...this.templates, [d.type]: [...list, { name: n, style: { ...lookDefaults(d.type, d.color), ...styleOf(d) } }] };
     saveTemplates(this.templates);
     this.changed();
   }
@@ -270,8 +276,10 @@ export class DrawingManager implements DrawingSource {
     const d = this.selectedDrawing;
     const t = d && this.templatesFor(d.type).find((x) => x.name === name);
     if (!t) return;
-    // A template without text takes the text off, so the drawing matches it.
-    this.setStyle({ label: '', ...t.style });
+    // Whatever the template doesn't say (older templates kept only what was changed) goes back
+    // to the default, and a template without text takes the text off: the drawing then looks
+    // exactly as it did when the template was saved.
+    this.setStyle({ ...lookDefaults(d.type, t.style.color ?? d.color), label: '', ...t.style });
   }
 
   deleteTemplate(type: DrawingType, name: string): void {
@@ -1291,6 +1299,19 @@ export class DrawingManager implements DrawingSource {
       e.preventDefault();
       this.deleteSelected();
     }
+  };
+}
+
+/** Every look setting a drawing of this type can have, at its default. */
+function lookDefaults(type: DrawingType, color: string): DrawingStyle {
+  const s = styleSupport(type);
+  return {
+    ...(s.line ? { width: DEFAULT_WIDTH, lineStyle: 'solid' as const } : {}),
+    ...(s.font ? { fontSize: DEFAULT_FONT_SIZE } : {}),
+    ...(s.zones ? { profitColor: DEFAULT_PROFIT_COLOR, lossColor: DEFAULT_LOSS_COLOR } : {}),
+    ...(s.fill ? { fillColor: color } : {}),
+    ...(s.fib ? { levels: [...FIB_LEVELS], trendLine: true } : {}),
+    ...(s.label ? { labelPos: DEFAULT_LABEL_POS, labelSize: DEFAULT_LABEL_SIZE } : {}),
   };
 }
 

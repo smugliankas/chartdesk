@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Templates bring back the whole look: a template saved with a thin solid line puts the line
+  back to thin and solid, not only the text. Templates saved earlier fill in what they lack
+  with the defaults.
+
 ## v0.3.3
 
 - cTrader: charts no longer hit cTrader's limit on history requests ("You are being rate
