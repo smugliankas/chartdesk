@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.3
+
+- cTrader: charts no longer hit cTrader's limit on history requests ("You are being rate
+  limited") when switching timeframes quickly. History requests go one at a time, spaced out,
+  and are asked again after a pause if cTrader still refuses; those of a chart already left are
+  dropped. The newest candle no longer shows up late because of it.
+- cTrader: on weekly and monthly charts the newest candle is there at once too, built from the
+  daily bars since the broker's last finished week or month.
+
 ## v0.3.2
 
 - Desktop app updates itself: it looks for a new version when it starts and every few hours,

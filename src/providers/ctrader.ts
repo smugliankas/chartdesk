@@ -9,6 +9,13 @@ const HOSTS = { demo: 'wss://demo.ctraderapi.com:5036', live: 'wss://live.ctrade
 const STORAGE_KEY = 'chartdesk:ctrader';
 const HEARTBEAT_MS = 10_000;
 const REQUEST_TIMEOUT_MS = 30_000;
+/**
+ * cTrader allows about 5 history requests a second (fewer in practice), so they go one at a
+ * time, this far apart; when cTrader still says "too many", the request waits and goes again.
+ */
+const HISTORY_GAP_MS = 300;
+const HISTORY_RETRY_MS = 1000;
+const HISTORY_RETRIES = 3;
 /** Bars asked for per request, counting back from its end time. */
 const PAGE_SIZE = 1000;
 
@@ -164,6 +171,12 @@ export class CTraderProvider implements DataProvider {
   private ready: Promise<void> | null = null;
   private pending = new Map<string, { resolve: (p: Record<string, unknown>) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
   private msgSeq = 0;
+  /** Counts charts asked for; history requests of an older one are dropped before they go. */
+  private chartSeq = 0;
+  private historyQueue: Promise<unknown> = Promise.resolve();
+  private lastHistoryAt = 0;
+  /** The bar being made, as built for the chart's history ("symbol:timeframe"). */
+  private formingCache = new Map<string, Candle>();
   private heartbeat: ReturnType<typeof setInterval> | undefined;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private reconnectDelay = 1000;
@@ -205,38 +218,61 @@ export class CTraderProvider implements DataProvider {
   // --- DataProvider -----------------------------------------------------------------
 
   async getCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
+    // A new chart: history requests still waiting for an older one are dropped.
+    const seq = ++this.chartSeq;
     // cTrader's history ends with the last finished bar; the one being made comes with the first
     // live message, a moment later. So it is built here at once from the smaller bars under it.
-    const [bars, forming] = await Promise.all([this.bars(symbol, tf, Date.now()), this.formingBar(symbol, tf).catch(() => null)]);
+    const [bars, forming] = await Promise.all([this.bars(symbol, tf, Date.now(), seq), this.formingBar(symbol, tf, seq).catch(() => null)]);
     const last = bars.at(-1);
-    const len = PERIOD_SECONDS[PERIODS[tf]];
-    // Only when the history's bars sit on the same clock (a broker could start days elsewhere).
-    if (forming && last && last.time % len !== 0) return bars;
-    if (forming && (!last || forming.time > last.time)) bars.push(forming);
-    else if (forming && last && forming.time === last.time) bars[bars.length - 1] = forming;
+    let bar = forming;
+    if (bar && last && last.time % PERIOD_SECONDS[PERIODS[tf]] !== 0) bar = null; // the broker's bars sit elsewhere on the clock
+    // Weeks and months start where the broker says: the bar after its last one.
+    if (!bar && last && (tf === '1w' || tf === '1M')) bar = await this.barAfter(symbol, tf, last, seq).catch(() => null);
+    if (bar && (!last || bar.time > last.time)) bars.push(bar);
+    else if (bar && last && bar.time === last.time) bars[bars.length - 1] = bar;
+    if (bar) this.formingCache.set(`${symbol}:${tf}`, bar);
     return bars;
   }
 
   /**
    * The bar still being made, from the 1-minute bars since it started (5-minute bars for a day).
-   * Not for 1-minute charts (nothing smaller) or weeks and months (their start depends on the broker).
+   * Not for 1-minute charts (nothing smaller); weeks and months: see barAfter.
    */
-  private async formingBar(symbol: string, tf: Timeframe): Promise<Candle | null> {
+  private formingBar(symbol: string, tf: Timeframe, seq: number): Promise<Candle | null> {
     const lower: Partial<Record<Timeframe, number>> = { '5m': 1, '15m': 1, '30m': 1, '1h': 1, '4h': 1, '1d': 5 };
     const sub = lower[tf];
-    if (!sub) return null;
+    if (!sub) return Promise.resolve(null);
     const len = PERIOD_SECONDS[PERIODS[tf]];
-    const start = Math.floor(Date.now() / 1000 / len) * len;
+    return this.joinBars(symbol, sub, Math.floor(Date.now() / 1000 / len) * len, seq);
+  }
+
+  /** The week or month after `last` (the broker's last finished one), from its daily bars. */
+  private barAfter(symbol: string, tf: '1w' | '1M', last: Candle, seq: number): Promise<Candle | null> {
+    let start: number;
+    if (tf === '1w') start = last.time + 7 * 86_400;
+    else {
+      const d = new Date(last.time * 1000);
+      start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCHours(), d.getUTCMinutes()) / 1000;
+    }
+    if (start * 1000 > Date.now()) return Promise.resolve(null);
+    return this.joinBars(symbol, 12, start, seq);
+  }
+
+  /** One bar starting at `start` (seconds), made of the `sub`-period bars since then. */
+  private async joinBars(symbol: string, sub: number, start: number, seq: number): Promise<Candle | null> {
     const s = await this.find(symbol);
     const digits = await this.digitsOf(s.symbolId);
-    const res = await this.request(PT.GET_TRENDBARS_REQ, {
-      ctidTraderAccountId: this.accountId(),
-      symbolId: s.symbolId,
-      period: sub,
-      fromTimestamp: start * 1000,
-      toTimestamp: Date.now(),
-      count: PAGE_SIZE,
-    });
+    const res = await this.history(
+      {
+        ctidTraderAccountId: this.accountId(),
+        symbolId: s.symbolId,
+        period: sub,
+        fromTimestamp: start * 1000,
+        toTimestamp: Date.now(),
+        count: PAGE_SIZE,
+      },
+      seq,
+    );
     const parts = ((res.trendbar as RawTrendbar[] | undefined) ?? [])
       .map((tb) => toCandle(tb, digits))
       .filter((c) => c.time >= start)
@@ -253,7 +289,7 @@ export class CTraderProvider implements DataProvider {
   }
 
   getCandlesBefore(symbol: string, tf: Timeframe, beforeTime: number): Promise<Candle[]> {
-    return this.bars(symbol, tf, beforeTime * 1000 - 1);
+    return this.bars(symbol, tf, beforeTime * 1000 - 1, this.chartSeq);
   }
 
   async searchSymbols(query: string): Promise<SymbolInfo[]> {
@@ -310,9 +346,11 @@ export class CTraderProvider implements DataProvider {
           if (bar) emit();
           else if (!seeding) {
             seeding = true;
-            void this.formingBar(symbol, tf)
+            // The bar the chart got with its history, while it is still the one being made.
+            const cached = this.formingCache.get(`${symbol}:${tf}`);
+            void Promise.resolve(cached && cached.time + len > Date.now() / 1000 ? cached : null)
               .then((forming) => {
-                if (forming && !bar) bar = forming;
+                if (forming && !bar) bar = { ...forming };
                 emit();
               })
               .catch(() => {})
@@ -374,21 +412,24 @@ export class CTraderProvider implements DataProvider {
 
   // --- history ------------------------------------------------------------------------
 
-  private async bars(symbol: string, tf: Timeframe, to: number, count = PAGE_SIZE): Promise<Candle[]> {
+  private async bars(symbol: string, tf: Timeframe, to: number, seq: number): Promise<Candle[]> {
     const s = await this.find(symbol);
     const digits = await this.digitsOf(s.symbolId);
     const period = PERIODS[tf];
     const range = maxRangeMs(period);
     // A range can fall on a weekend or holiday with no bars: step further back a few times.
     for (let tries = 0, end = to; tries < 6; tries++, end -= range) {
-      const res = await this.request(PT.GET_TRENDBARS_REQ, {
-        ctidTraderAccountId: this.accountId(),
-        symbolId: s.symbolId,
-        period,
-        fromTimestamp: Math.max(0, end - range),
-        toTimestamp: end,
-        count,
-      });
+      const res = await this.history(
+        {
+          ctidTraderAccountId: this.accountId(),
+          symbolId: s.symbolId,
+          period,
+          fromTimestamp: Math.max(0, end - range),
+          toTimestamp: end,
+          count: PAGE_SIZE,
+        },
+        seq,
+      );
       const bars = ((res.trendbar as RawTrendbar[] | undefined) ?? []).map((tb) => toCandle(tb, digits));
       if (bars.length > 0) return bars.sort((a, b) => a.time - b.time);
       if (end - range <= 0) break;
@@ -667,11 +708,40 @@ export class CTraderProvider implements DataProvider {
     });
   }
 
+  /**
+   * A trendbar request, in line behind the others and spaced out to stay under cTrader's limit.
+   * Dropped (STALE) when a newer chart was asked for before its turn came.
+   */
+  private history(payload: object, seq: number): Promise<Record<string, unknown>> {
+    const run = async (): Promise<Record<string, unknown>> => {
+      for (let attempt = 0; ; attempt++) {
+        if (seq !== this.chartSeq) throw new CTraderError('STALE', 'A newer chart was asked for.');
+        const wait = this.lastHistoryAt + HISTORY_GAP_MS - Date.now();
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+        this.lastHistoryAt = Date.now();
+        try {
+          return await this.request(PT.GET_TRENDBARS_REQ, payload);
+        } catch (e) {
+          if (attempt >= HISTORY_RETRIES || !isRateLimit(e)) throw e;
+          this.lastHistoryAt = Date.now() + HISTORY_RETRY_MS - HISTORY_GAP_MS;
+        }
+      }
+    };
+    const result = this.historyQueue.then(run, run);
+    this.historyQueue = result.catch(() => {});
+    return result;
+  }
+
   /** Like send, after connecting and signing in when needed. */
   private async request(payloadType: number, payload: object): Promise<Record<string, unknown>> {
     await this.ensureReady();
     return this.send(payloadType, payload);
   }
+}
+
+/** cTrader's "too many requests": REQUEST_FREQUENCY_EXCEEDED, "You are being rate limited". */
+function isRateLimit(e: unknown): boolean {
+  return e instanceof CTraderError && /FREQUENCY_EXCEEDED|rate limit/i.test(`${e.code} ${e.message}`);
 }
 
 function ignoreAlready(err: unknown): void {

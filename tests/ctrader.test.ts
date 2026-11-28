@@ -282,13 +282,15 @@ describe('cTrader provider', () => {
     expect(candles.at(-1)).toEqual({ time: hour * 60, open: 1.0911, high: 1.0914, low: 1.0905, close: 1.0911, volume: 5 });
   });
 
-  it('moves the newest bar from the history while no live bar has come yet', async () => {
+  it('moves the bar the chart got with its history while no live bar has come yet', async () => {
     const { provider, server } = setup({ accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 30 * 86400_000, accountId: 77 });
     const hour = Math.floor(Date.now() / 3_600_000) * 60;
     server.bars.set(1, [
       { utcTimestampInMinutes: hour - 60, low: 109_000, deltaOpen: 10, deltaHigh: 50, deltaClose: 20, volume: 9 },
       { utcTimestampInMinutes: hour, low: 109_100, deltaOpen: 10, deltaHigh: 50, deltaClose: 20, volume: 2 },
     ]);
+    server.barsOf.set('1:1', [{ utcTimestampInMinutes: hour, low: 109_100, deltaOpen: 10, deltaHigh: 50, deltaClose: 20, volume: 2 }]);
+    await provider.getCandles('EURUSD', '1h');
     const got: { time: number; close: number; high: number }[] = [];
     const stop = provider.subscribe('EURUSD', '1h', (c) => got.push(c));
     await tick();
@@ -297,6 +299,51 @@ describe('cTrader provider', () => {
     for (let i = 0; i < 4; i++) await tick();
     expect(got.at(-1)).toMatchObject({ time: hour * 60, close: 1.092, high: 1.092 });
     stop();
+  });
+
+  it('waits and asks again when cTrader says there were too many history requests', async () => {
+    const { provider, server } = setup({ accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 30 * 86400_000, accountId: 77 });
+    const hour = Math.floor(Date.now() / 3_600_000) * 60;
+    server.bars.set(1, [{ utcTimestampInMinutes: hour - 60, low: 109_000, deltaOpen: 10, deltaHigh: 50, deltaClose: 20, volume: 9 }]);
+    let refusals = 1;
+    const answer = server.answer.bind(server);
+    server.answer = (socket, msg) => {
+      if (msg.payloadType === PT.GET_TRENDBARS_REQ && refusals-- > 0) {
+        server.sent.push({ payloadType: msg.payloadType, payload: msg.payload });
+        return socket.receive({ clientMsgId: msg.clientMsgId, payloadType: PT.OA_ERROR, payload: { errorCode: 'REQUEST_FREQUENCY_EXCEEDED', description: 'You are being rate limited' } });
+      }
+      return answer(socket, msg);
+    };
+    const candles = await provider.getCandles('EURUSD', '1m');
+    expect(candles).toHaveLength(1);
+    expect(server.sent.filter((m) => m.payloadType === PT.GET_TRENDBARS_REQ)).toHaveLength(2);
+  }, 10_000);
+
+  it("drops an older chart's history requests that have not gone yet", async () => {
+    const { provider, server } = setup({ accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 30 * 86400_000, accountId: 77 });
+    const hour = Math.floor(Date.now() / 3_600_000) * 60;
+    server.bars.set(1, [{ utcTimestampInMinutes: hour - 60, low: 109_000, deltaOpen: 10, deltaHigh: 50, deltaClose: 20, volume: 9 }]);
+    const first = provider.getCandles('EURUSD', '1h');
+    const second = provider.getCandles('EURUSD', '4h');
+    await expect(first).rejects.toThrow(/newer chart/);
+    await expect(second).resolves.toBeDefined();
+    const periods = server.sent.filter((m) => m.payloadType === PT.GET_TRENDBARS_REQ).map((m) => m.payload.period);
+    expect(periods).not.toContain(9);
+  });
+
+  it('builds the current week from the daily bars after the last finished week', async () => {
+    const { provider, server } = setup({ accessToken: 'a', refreshToken: 'r', expiresAt: Date.now() + 30 * 86400_000, accountId: 77 });
+    const day = Math.floor(Date.now() / 86_400_000) * 1440; // today, in minutes
+    const weekStart = day - 2 * 1440;
+    server.barsOf.set('1:13', [{ utcTimestampInMinutes: weekStart - 7 * 1440, low: 108_000, deltaOpen: 10, deltaHigh: 500, deltaClose: 300, volume: 50 }]);
+    server.barsOf.set('1:12', [
+      { utcTimestampInMinutes: weekStart - 1440, low: 107_000, deltaOpen: 0, deltaHigh: 0, deltaClose: 0, volume: 1 }, // last week: left out
+      { utcTimestampInMinutes: weekStart, low: 108_200, deltaOpen: 100, deltaHigh: 300, deltaClose: 200, volume: 10 },
+      { utcTimestampInMinutes: day, low: 108_100, deltaOpen: 200, deltaHigh: 500, deltaClose: 400, volume: 5 },
+    ]);
+    const candles = await provider.getCandles('EURUSD', '1w');
+    expect(candles).toHaveLength(2);
+    expect(candles[1]).toEqual({ time: weekStart * 60, open: 1.083, high: 1.086, low: 1.081, close: 1.085, volume: 15 });
   });
 
   it('gives watchlist quotes with the change since the last session close', async () => {
