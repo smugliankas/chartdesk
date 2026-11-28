@@ -127,7 +127,8 @@ a native full screen and a real "Save as" dialog for chart images and backups. I
 on the [Releases](https://github.com/smugliankas/chartdesk/releases) page (a `.dmg` for macOS,
 Apple Silicon and Intel; an `.msi` or `.exe` for Windows).
 
-The builds are not signed yet, so the system warns the first time you open them:
+The builds are not signed yet (Windows signing through the SignPath Foundation is on its way,
+see [Code signing policy](#code-signing-policy)), so the system warns the first time you open them:
 
 - **macOS:** open ChartDesk once and close the warning. Then go to **System Settings →
   Privacy & Security**, scroll down to "ChartDesk was blocked" and click **Open Anyway**.
@@ -208,6 +209,29 @@ src-tauri/                   desktop app (Tauri): window, installers, save dialo
 - [ ] More timeframes and chart types
 - [x] Desktop app (Tauri) for Windows and macOS
 - [ ] Desktop: forex history from Dukascopy, notifications from the system
+
+## Code signing policy
+
+Windows releases are to be signed with free code signing provided by
+[SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org)
+(application in progress; until then the builds are unsigned).
+
+- Only the installers built by the [Desktop app](.github/workflows/desktop.yml) workflow on
+  GitHub Actions, from this repository's own source code, are signed. Nothing built on a
+  personal computer is.
+- Committers and reviewers: [Ömer Çolak](https://github.com/smugliankas)
+- Approvers: [Ömer Çolak](https://github.com/smugliankas)
+
+## Privacy
+
+ChartDesk has no server and collects no data about you. Your drawings, alerts, watchlist and
+settings stay on your own computer.
+
+The app talks only to the market data services you choose to use, to load prices: Binance,
+Bybit and, in the desktop app, cTrader. Signing in to cTrader happens on cTrader's own page;
+the sign-in token is kept on your computer and sent only to cTrader. This program will not
+transfer any other information to other networked systems unless specifically requested by
+the user.
 
 ## License
 
