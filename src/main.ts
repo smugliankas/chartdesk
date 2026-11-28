@@ -27,6 +27,7 @@ import { TF_LABELS, TF_SECONDS, TIMEFRAMES, type Candle, type Timeframe } from '
 import { createAlertsPanel } from './ui/alertsPanel';
 import { showContextMenu, type MenuEntry } from './ui/contextMenu';
 import { createSettingsDialog } from './ui/settingsDialog';
+import { setupUpdates } from './ui/updates';
 import { createStyleBar } from './ui/styleBar';
 import { attachSymbolSearch } from './ui/symbolSearch';
 import { searchAll } from './providers/search';
@@ -184,7 +185,7 @@ const settingsDialog = createSettingsDialog(() => cc.appearance, applyAppearance
     setStatus(`Backup saved: ${n(s.drawings, 'drawing')} on ${n(s.drawingSymbols.length, 'symbol')}, ${n(s.alerts, 'alert')}.`);
   },
   onImport: () => chooseAndRestoreBackup((message) => setStatus(message, true)),
-});
+}, [setupUpdates()]);
 applyAppearance(loadAppearance());
 
 // --- top bar ---------------------------------------------------------------------

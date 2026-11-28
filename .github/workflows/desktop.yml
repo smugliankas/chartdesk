@@ -2,7 +2,7 @@
 # installer for Windows (.msi and .exe).
 #
 # - Push a version tag (git tag v0.3.0 && git push --tags): the installers go to a draft
-#   release on GitHub, to check and publish.
+#   release on GitHub, to check and publish. Once published, installed apps offer the update.
 # - Or run it by hand (Actions → Desktop app → Run workflow): the installers are attached to
 #   the run as artifacts, for a quick try.
 name: Desktop app
@@ -55,12 +55,20 @@ jobs:
           # secrets: Settings → Secrets and variables → Actions. Without them cTrader is off.
           CTRADER_CLIENT_ID: ${{ secrets.CTRADER_CLIENT_ID }}
           CTRADER_CLIENT_SECRET: ${{ secrets.CTRADER_CLIENT_SECRET }}
+          # Signs the updates (the app accepts only updates signed with this key). The key was
+          # made with `npx tauri signer generate`; its public half is in tauri.conf.json.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           # Only a tag makes a release; a run by hand just builds.
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           releaseName: ChartDesk ${{ github.ref_name }}
           releaseBody: See CHANGELOG.md for what's new. The macOS and Windows builds are not signed yet; see the README for how to open them.
           releaseDraft: true
+          # latest.json, which installed apps read to find updates: it lives on the newest
+          # published release. On Windows, updates use the .exe installer.
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
 
       - if: github.ref_type != 'tag'

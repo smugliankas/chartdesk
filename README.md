@@ -136,6 +136,11 @@ see [Code signing policy](#code-signing-policy)), so the system warns the first 
   in Terminal once.
 - **Windows:** on "Windows protected your PC", click **More info**, then **Run anyway**.
 
+**Updates:** the desktop app looks for a new version when it starts (and every few hours). When
+there is one, a card offers to install it; the app restarts with the new version, and your
+drawings and settings stay. Settings → Updates shows the version and checks by hand. Updates
+are signed, and the app installs only ones signed with ChartDesk's own key.
+
 To run the desktop app from the source code, install [Rust](https://rustup.rs) once, then:
 
 ```bash
@@ -146,6 +151,10 @@ npm run desktop:build    # makes the installer for this computer (in src-tauri/t
 
 Installers for both systems are built on GitHub: push a version tag (`git tag v0.3.0 && git push --tags`)
 and they appear in a draft release, or run **Actions → Desktop app → Run workflow** for a test build.
+Publishing the release makes it the update for every installed app. The build signs the updates
+with the key in the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+repository secrets (made once with `npx tauri signer generate`); building installers on your
+own computer needs the same two as environment variables.
 
 ### cTrader in your own build
 

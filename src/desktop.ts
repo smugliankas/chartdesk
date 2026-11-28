@@ -72,3 +72,30 @@ export const desktopCTrader = {
     return invoke('ctrader_login');
   },
 };
+
+/** A newer version found on GitHub. */
+export interface AvailableUpdate {
+  version: string;
+  current: string;
+  notes?: string | null;
+}
+
+/** The desktop app's updates (see src-tauri/src/updater.rs). */
+export const desktopUpdater = {
+  /** The newer version, or null when this one is the newest. */
+  async check(): Promise<AvailableUpdate | null> {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke<AvailableUpdate | null>('update_check');
+  },
+  /** Downloads and installs the update found by check(), then the app starts again. */
+  async install(onProgress: (percent: number) => void): Promise<void> {
+    const { invoke, Channel } = await import('@tauri-apps/api/core');
+    const progress = new Channel<number>();
+    progress.onmessage = onProgress;
+    await invoke('update_install', { progress });
+  },
+  async version(): Promise<string> {
+    const { getVersion } = await import('@tauri-apps/api/app');
+    return getVersion();
+  },
+};

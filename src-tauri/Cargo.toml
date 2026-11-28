@@ -1,6 +1,6 @@
 [package]
 name = "chartdesk"
-version = "0.3.1"
+version = "0.3.2"
 description = "ChartDesk: open-source, local-first charting app"
 authors = ["Ömer Çolak"]
 license = "AGPL-3.0-only"
@@ -22,6 +22,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-updater = "2"
 ureq = { version = "2", features = ["json"] }
 url = "2"
 

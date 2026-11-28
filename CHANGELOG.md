@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.2
+
+- Desktop app updates itself: it looks for a new version when it starts and every few hours,
+  and a card offers "Update and restart" (with download progress). Settings → Updates shows the
+  version and checks by hand. Updates are signed; only ones signed with ChartDesk's key install.
+
 ## v0.3.1
 
 - cTrader: the live candle now moves with every price. cTrader sends the forming bar without a

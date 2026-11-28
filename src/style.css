@@ -2256,3 +2256,67 @@ button:focus-visible {
   border-radius: 50%;
   background: var(--gain);
 }
+
+/* --- Updates (desktop app, updates.ts) ------------------------------------------------- */
+
+.update-card {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 60;
+  width: 340px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  animation: pop-in 0.18s ease-out;
+}
+
+.update-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.update-title {
+  font-size: 13px;
+}
+
+.update-detail {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.update-bar {
+  height: 4px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.update-bar span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+.update-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.update-version {
+  color: var(--muted);
+}
+
+.update-status.error {
+  color: var(--loss);
+}

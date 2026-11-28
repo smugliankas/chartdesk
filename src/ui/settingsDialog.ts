@@ -9,6 +9,8 @@ export function createSettingsDialog(
   get: () => Appearance,
   onChange: (a: Appearance) => void,
   backup: { onExport: () => void; onImport: () => void },
+  /** More sections, put before Backup (e.g. Updates in the desktop app). */
+  extra: (HTMLElement | null)[] = [],
 ): { open: () => void; sync: () => void } {
   const dialog = document.createElement('dialog');
   dialog.id = 'settingsDialog';
@@ -79,6 +81,8 @@ export function createSettingsDialog(
       </div>
     </form>`;
   document.body.append(dialog);
+  const backupHeading = [...dialog.querySelectorAll('h3')].find((h) => h.textContent === 'Backup')!;
+  for (const section of extra) if (section) backupHeading.before(...section.childNodes);
   for (const select of dialog.querySelectorAll('select')) enhanceSelect(select);
 
   const inputs = [...dialog.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[data-field], select[data-field]')];
